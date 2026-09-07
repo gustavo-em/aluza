@@ -27,7 +27,7 @@ import type { TaskCopy } from '../../features/tasks/presentation/localization/ta
 import { PressableScale } from '../../features/tasks/presentation/views/PressableScale';
 import { AluzaSymbol } from './AluzaSymbol';
 import { GroundFade } from './GroundFade';
-import { DayCutout, ScoreCutout, SpaceCutout } from './onboarding/cutouts';
+import { DayCutout, InviteCutout, SpaceCutout } from './onboarding/cutouts';
 import { onboardingSteps } from './onboarding/onboardingSteps';
 import { brandGround, type BrandGround } from '../theme/brandGround';
 
@@ -287,7 +287,7 @@ export function OnboardingScreen({ copy, onFinish }: OnboardingScreenProps) {
                       <DayCutout demo={copy.onboarding.demo} />
                     ) : null}
                     {page.id === 'invite' ? (
-                      <ScoreCutout demo={copy.onboarding.demo} />
+                      <InviteCutout demo={copy.onboarding.demo} />
                     ) : null}
                   </Cutout>
 

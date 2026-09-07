@@ -528,11 +528,11 @@ export interface TaskCopy {
       taskPassport: string;
       taskPassportMeta: string;
       taskRoute: string;
-      scoreYouLabel: string;
-      scoreOtherLabel: string;
-      scoreOf: string;
-      scoreStreak: string;
-      scorePrivate: string;
+      inviteBubble: string;
+      inviteLink: string;
+      inviteBubbleMeta: string;
+      inviteJoinedTitle: string;
+      inviteJoinedMeta: string;
     };
   };
   celebration: {
@@ -1034,8 +1034,8 @@ const ptBR: TaskCopy = {
         body: 'O que cada um levou, o que fechou, quem está em foco. Sem “e aquilo?”.',
       },
       {
-        title: 'Sem placar entre vocês.',
-        body: 'Cada um leva três. Seu progresso é seu — o espaço mostra, não compara.',
+        title: 'Quem divide a vida, divide o espaço.',
+        body: 'Um link e a pessoa entra — sem cadastro antes, sem combinar nada. O espaço já nasce dos dois.',
       },
     ],
     next: 'Próximo',
@@ -1069,11 +1069,11 @@ const ptBR: TaskCopy = {
       taskPassport: 'Renovar o passaporte',
       taskPassportMeta: 'Você · fechou às 11:05',
       taskRoute: 'Fechar o roteiro dos três dias',
-      scoreYouLabel: 'VOCÊ · HOJE',
-      scoreOtherLabel: 'JÚLIA · HOJE',
-      scoreOf: 'de 3',
-      scoreStreak: '12 dias seguidos',
-      scorePrivate: 'só ela vê o dela',
+      inviteBubble: 'Entra no nosso espaço:',
+      inviteLink: 'aluza.app/e/7k2xazjm',
+      inviteBubbleMeta: 'enviado · 18:02',
+      inviteJoinedTitle: 'Júlia entrou',
+      inviteJoinedMeta: 'Casa · Você e Júlia · agora',
     },
   },
   celebration: {
@@ -1573,8 +1573,8 @@ const enUS: TaskCopy = {
         body: 'What each of you took on, what got closed, who is in focus. No more “and that other thing?”.',
       },
       {
-        title: 'No scoreboard between you.',
-        body: 'You each take three. Your progress is yours — the space shows, it does not compare.',
+        title: 'Whoever shares the life shares the space.',
+        body: "One link and they're in — no sign-up first, nothing to set up. The space starts out as both of yours.",
       },
     ],
     next: 'Next',
@@ -1608,11 +1608,11 @@ const enUS: TaskCopy = {
       taskPassport: 'Renew the passport',
       taskPassportMeta: 'You · closed at 11:05',
       taskRoute: 'Settle the three-day route',
-      scoreYouLabel: 'YOU · TODAY',
-      scoreOtherLabel: 'JÚLIA · TODAY',
-      scoreOf: 'of 3',
-      scoreStreak: '12 days running',
-      scorePrivate: 'only she sees hers',
+      inviteBubble: 'Come into our space:',
+      inviteLink: 'aluza.app/e/7k2xazjm',
+      inviteBubbleMeta: 'sent · 6:02 pm',
+      inviteJoinedTitle: 'Júlia joined',
+      inviteJoinedMeta: 'Casa · You and Júlia · just now',
     },
   },
   celebration: {

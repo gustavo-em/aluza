@@ -234,32 +234,27 @@ export function DayCutout({ demo }: { demo: CutoutDemo }) {
   );
 }
 
-/* ── Step 3 · no scoreboard ─────────────────────────────────────────────── */
+/* ── Step 3 · the invite ────────────────────────────────────────────────── */
 
 /**
- * Two "today" cards tilted away from each other. The literal picture of what
- * the step says: different numbers, neither one bigger than the other.
+ * The message that carries the link, and the space a moment later. Two cards
+ * tilted away from each other like the ones before them, but nothing in them
+ * is a number: this step is about how the other person gets in, because the
+ * button right under it is the one that sends the link.
  */
-export function ScoreCutout({ demo }: { demo: CutoutDemo }) {
+export function InviteCutout({ demo }: { demo: CutoutDemo }) {
   return (
     <CutoutRoot>
-      <ScoreInk>
-        <ScoreEyebrowInk>{demo.scoreYouLabel}</ScoreEyebrowInk>
-        <ScoreLine>
-          <ScoreValueInk>3</ScoreValueInk>
-          <ScoreOfInk>{demo.scoreOf}</ScoreOfInk>
-        </ScoreLine>
-        <ScoreNoteInk>{demo.scoreStreak}</ScoreNoteInk>
-      </ScoreInk>
+      <InviteBubble>
+        <InviteBubbleText>{demo.inviteBubble}</InviteBubbleText>
+        <InviteLinkText>{demo.inviteLink}</InviteLinkText>
+        <InviteBubbleMeta>{demo.inviteBubbleMeta}</InviteBubbleMeta>
+      </InviteBubble>
 
-      <ScorePaper>
-        <ScoreEyebrowPaper>{demo.scoreOtherLabel}</ScoreEyebrowPaper>
-        <ScoreLine>
-          <ScoreValuePaper>2</ScoreValuePaper>
-          <ScoreOfPaper>{demo.scoreOf}</ScoreOfPaper>
-        </ScoreLine>
-        <ScoreNotePaper>{demo.scorePrivate}</ScoreNotePaper>
-      </ScorePaper>
+      <InviteJoined>
+        <InviteJoinedTitle>{demo.inviteJoinedTitle}</InviteJoinedTitle>
+        <InviteJoinedMeta>{demo.inviteJoinedMeta}</InviteJoinedMeta>
+      </InviteJoined>
     </CutoutRoot>
   );
 }
@@ -571,83 +566,59 @@ const CountValue = styled.Text`
   margin-top: 4px;
 `;
 
-const ScoreInk = styled.View`
+const InviteBubble = styled.View`
   position: absolute;
-  left: 24px;
+  left: 20px;
   top: 0;
-  width: 150px;
+  width: 190px;
   background-color: ${brandGround.tinta};
   border-radius: 20px;
-  padding: 16px 18px;
+  border-bottom-left-radius: 6px;
+  padding: 14px 16px;
   transform: rotate(-4deg);
 `;
 
-const ScorePaper = styled.View`
+const InviteBubbleText = styled.Text`
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  color: #fffdf7;
+`;
+
+const InviteLinkText = styled.Text`
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 20px;
+  color: ${brandGround.sol};
+`;
+
+const InviteBubbleMeta = styled.Text`
+  font-size: 11px;
+  font-weight: 600;
+  color: ${brandGround.onTintaSubtle};
+  margin-top: 8px;
+  text-align: right;
+`;
+
+const InviteJoined = styled.View`
   position: absolute;
-  right: 20px;
-  top: 32%;
-  width: 150px;
+  right: 16px;
+  top: 46%;
+  width: 176px;
   background-color: ${brandGround.card};
   border-radius: 20px;
   padding: 16px 18px;
   transform: rotate(4deg);
 `;
 
-const ScoreLine = styled.View`
-  flex-direction: row;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 6px;
-`;
-
-const ScoreEyebrowInk = styled.Text`
-  font-size: 11px;
+const InviteJoinedTitle = styled.Text`
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: 1.8px;
-  color: ${brandGround.sol};
-`;
-
-const ScoreEyebrowPaper = styled.Text`
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.8px;
-  color: ${brandGround.cardMuted};
-`;
-
-const ScoreValueInk = styled.Text`
-  font-size: 40px;
-  font-weight: 800;
-  letter-spacing: -2px;
-  color: #fffdf7;
-`;
-
-const ScoreValuePaper = styled.Text`
-  font-size: 40px;
-  font-weight: 800;
-  letter-spacing: -2px;
+  letter-spacing: -0.6px;
   color: ${brandGround.cardInk};
 `;
 
-const ScoreOfInk = styled.Text`
-  font-size: 16px;
-  font-weight: 800;
-  color: ${brandGround.onTintaSubtle};
-`;
-
-const ScoreOfPaper = styled.Text`
-  font-size: 16px;
-  font-weight: 800;
-  color: ${brandGround.cardMuted};
-`;
-
-const ScoreNoteInk = styled.Text`
-  font-size: 12px;
-  font-weight: 600;
-  color: ${brandGround.onTintaSubtle};
-  margin-top: 6px;
-`;
-
-const ScoreNotePaper = styled.Text`
+const InviteJoinedMeta = styled.Text`
   font-size: 12px;
   font-weight: 600;
   color: ${brandGround.cardMuted};
