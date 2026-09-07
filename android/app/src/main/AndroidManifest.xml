@@ -11,6 +11,14 @@
          closed, and the same check surviving a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Play Services measurement (Firebase Analytics) already merges this in
+         from its own library manifest, so the built bundle carries it either
+         way. It is declared here so the Play Console declaration has a visible
+         counterpart in our source, and so dropping Analytics one day is a
+         deliberate edit rather than a silent loss of the advertising id -
+         which, on Android 13+, would come back as zeros and take attribution
+         with it. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <application
       android:name=".MainApplication"
