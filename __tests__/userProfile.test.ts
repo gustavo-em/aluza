@@ -299,7 +299,7 @@ describe('profile bootstrap', () => {
       photoURL: null,
     });
     // The handle held by the other account was never touched.
-    expect(gateway.reservations()['gustavo_rosa']).toBe('uid-2');
+    expect(gateway.reservations().gustavo_rosa).toBe('uid-2');
   });
 
   it('reserves the suggested handle when nothing is stored yet', async () => {
