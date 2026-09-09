@@ -23,13 +23,13 @@ const base: Task = {
 
 describe('what a task says about itself', () => {
   it('separates the facts by kind, so each can carry its own glyph', () => {
-    // Joined into one line, "média · amanhã · Caixa" gave no way to tell a
+    // Joined into one line, "média · amanhã · Avulsas" gave no way to tell a
     // priority from a deadline from a list.
     const facts = taskFacts(
       { ...base, dueAtMs: now + DAY_MS },
       now,
       copy,
-      'Caixa',
+      'Avulsas',
     );
 
     expect(facts.priority).toEqual({
@@ -42,7 +42,7 @@ describe('what a task says about itself', () => {
       label: 'amanhã',
       late: false,
     });
-    expect(facts.listName).toBe('Caixa');
+    expect(facts.listName).toBe('Avulsas');
     expect(facts.stale).toBeNull();
   });
 
@@ -91,9 +91,9 @@ describe('what a task says about itself', () => {
       { ...base, dueAtMs: now + DAY_MS },
       now,
       copy,
-      'Caixa',
+      'Avulsas',
     );
 
-    expect(describeTask(facts)).toBe('média · amanhã · Caixa');
+    expect(describeTask(facts)).toBe('média · amanhã · Avulsas');
   });
 });

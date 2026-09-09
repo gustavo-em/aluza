@@ -979,7 +979,7 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
         .then(remote => {
           if (remote == null) {
             // Taken down by its owner: this device gets the same outcome as
-            // a local delete, tasks and all moved to Caixa.
+            // a local delete, tasks and all moved to Avulsas.
             run(deleteTaskList(current.current, listId, clock.now()));
           } else {
             run(applyRemoteList(current.current, listId, remote, clock.now()));

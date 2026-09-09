@@ -126,14 +126,14 @@ describe('the one fact a task row shows', () => {
     expect(
       rowFact(
         input({
-          facts: facts({ listName: 'Caixa' }),
+          facts: facts({ listName: 'Avulsas' }),
           listColor: 'sun',
           listIcon: 'inbox',
         }),
       ),
     ).toMatchObject({
       kind: 'project',
-      text: 'Caixa',
+      text: 'Avulsas',
       project: { color: 'sun', icon: 'inbox' },
     });
   });

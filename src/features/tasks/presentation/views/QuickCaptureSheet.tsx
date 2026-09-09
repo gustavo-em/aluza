@@ -75,6 +75,7 @@ import {
   sheetExit,
   sheetSlideEnter,
 } from '../../../../app/animation/motion';
+import { displayNameOf } from '../models/listName';
 
 /** What an existing task looks like when the same sheet is used to change it. */
 export interface SheetSubject {
@@ -329,7 +330,9 @@ export function QuickCaptureSheet({
       ? newListName
       : listOverride === undefined && draft.listName != null
       ? draft.listName
-      : chosenList?.name ?? copy.capture.noList;
+      : chosenList == null
+      ? copy.capture.noList
+      : displayNameOf(chosenList, copy);
   // Editing never re-reads the text, so an estimate typed months ago does not
   // reappear as a chip on a title being renamed.
   const estimateMinutes = isEditing ? null : draft.estimatedMinutes;

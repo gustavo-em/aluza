@@ -29,7 +29,7 @@ describe('manage task lists', () => {
     expect(duplicate.events).toEqual([]);
   });
 
-  it('renames a personal list but protects Caixa', () => {
+  it('renames a personal list but protects Avulsas', () => {
     const created = createTaskList(EMPTY_WORKSPACE, 'Viagem', now);
     const renamed = renameTaskList(
       created.workspace,
@@ -53,7 +53,7 @@ describe('manage task lists', () => {
     expect(protectedInbox.events).toEqual([]);
   });
 
-  it('moves a deleted list’s tasks into Caixa without deleting the tasks', () => {
+  it('moves a deleted list’s tasks into Avulsas without deleting the tasks', () => {
     const created = createTaskList(EMPTY_WORKSPACE, 'Portfólio', now);
     const workspace = {
       ...created.workspace,

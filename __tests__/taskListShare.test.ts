@@ -41,9 +41,9 @@ describe('shared project rules', () => {
     expect(isShared(withMember(shared, editor))).toBe(true);
   });
 
-  it('never shares the Caixa', () => {
+  it('never shares Avulsas', () => {
     expect(
-      canShare({ id: 'inbox', name: 'Caixa', color: 'sun', icon: 'inbox' }),
+      canShare({ id: 'inbox', name: 'Avulsas', color: 'sun', icon: 'inbox' }),
     ).toBe(false);
     expect(canShare(shared)).toBe(true);
   });
@@ -153,7 +153,7 @@ describe('shared project rules', () => {
     const lists = sanitizeLists([
       {
         id: 'inbox',
-        name: 'Caixa',
+        name: 'Avulsas',
         color: 'sun',
         icon: 'inbox',
         share: shared.share,

@@ -6,7 +6,7 @@ import { homeSections } from '../src/features/tasks/presentation/models/homeSect
 const now = new Date(2026, 7, 28, 10, 0).getTime();
 const copy = getTaskCopy('pt-BR');
 const lists: readonly TaskList[] = [
-  { id: 'inbox', name: 'Caixa', color: 'sun', icon: 'inbox' },
+  { id: 'inbox', name: 'Avulsas', color: 'sun', icon: 'inbox' },
   { id: 'casa', name: 'Casa', color: 'mint', icon: 'home' },
 ];
 
@@ -39,7 +39,7 @@ describe('home sections', () => {
   it('uses list names as headings when the list lens is selected', () => {
     const sections = homeSections(tasks, 'list', now, 'pt-BR', copy, lists);
 
-    expect(sections.map(section => section.title)).toEqual(['Caixa', 'Casa']);
+    expect(sections.map(section => section.title)).toEqual(['Avulsas', 'Casa']);
     expect(sections[0].tasks.map(entry => entry.id)).toEqual([
       'inbox-medium',
       'inbox-low',

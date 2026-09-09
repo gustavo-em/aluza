@@ -55,6 +55,7 @@ import { PressableScale } from '../views/PressableScale';
 import { QuickCaptureSheet } from '../views/QuickCaptureSheet';
 import { SectionHeader } from '../views/SectionHeader';
 import { TaskRow, type FocusRowState } from '../views/TaskRow';
+import { displayNameOf } from '../models/listName';
 
 interface TodayScreenProps {
   copy: TaskCopy;
@@ -224,6 +225,12 @@ export function TodayScreen({
     };
   }
 
+  function listNameOf(task: Task) {
+    const list = viewModel.listOf(task.listId);
+
+    return list == null ? null : displayNameOf(list, copy);
+  }
+
   return (
     <Screen>
       <Content
@@ -390,7 +397,7 @@ export function TodayScreen({
                       // had never been filed, which is not what blank means.
                       listColor={viewModel.listOf(task.listId)?.color ?? null}
                       listIcon={viewModel.listOf(task.listId)?.icon ?? null}
-                      listName={viewModel.listOf(task.listId)?.name ?? null}
+                      listName={listNameOf(task)}
                       // Seen from the day, a group's task is a sentence with
                       // no context — "Confirmar o salão" for what? The pill
                       // is what carries the reason out of the group with it.

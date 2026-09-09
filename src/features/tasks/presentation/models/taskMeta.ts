@@ -12,7 +12,7 @@ import type { TaskCopy } from '../localization/taskCopy';
  * What a task says about itself, split by kind rather than joined into a
  * sentence.
  *
- * The line used to read "média · amanhã · Caixa", and there was no way to know
+ * The line used to read "média · amanhã · Avulsas", and there was no way to know
  * that the first word was a priority, the second a deadline and the third a
  * list — "média" could as easily have been a size, and "amanhã" a duration.
  * Splitting the facts by kind lets the card put the right glyph in front of

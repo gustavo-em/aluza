@@ -96,7 +96,7 @@ export function renameTaskList(
   return committed({ ...workspace, lists }, at);
 }
 
-/** Removing a list never removes its work: every task returns to Caixa. */
+/** Removing a list never removes its work: every task returns to Avulsas. */
 export function deleteTaskList(
   workspace: Workspace,
   listId: string,
@@ -110,7 +110,7 @@ export function deleteTaskList(
   }
 
   const lists = workspace.lists.filter(list => list.id !== listId);
-  // The Caixa has no groups, so a task that fell into it from a deleted space
+  // Avulsas has no groups, so a task that fell into it from a deleted space
   // comes out of the group it was in rather than pointing at one nothing can
   // open.
   const tasks = workspace.tasks.map(task =>

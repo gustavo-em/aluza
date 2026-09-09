@@ -152,7 +152,7 @@ frente, com a mesma `ActionButton`/`ActionText`:
 ) : null}
 ```
 
-`canShare` é falso para a Caixa — e por isso a Caixa não mostra o `MoreButton`
+`canShare` é falso para Avulsas — e por isso Avulsas não mostra o `MoreButton`
 hoje; nada a fazer ali.
 
 ### 2.2 Tarefas de projeto compartilhado

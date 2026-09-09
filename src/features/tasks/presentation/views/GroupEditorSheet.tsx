@@ -110,7 +110,7 @@ export function GroupEditorSheet({
   const usable = name.trim().length > 0;
   const tone = projectTone(theme, color);
   const badgeInk = projectBadgeInk(theme, color);
-  // Every icon but the inbox, which is the Caixa's own and belongs to nothing
+  // Every icon but the inbox, which is Avulsas's own and belongs to nothing
   // a person makes.
   const icons = useMemo(
     () => projectIcons.filter(value => value !== 'inbox'),

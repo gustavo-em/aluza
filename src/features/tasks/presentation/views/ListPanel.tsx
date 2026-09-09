@@ -6,6 +6,7 @@ import { ProjectGlyph, PlusGlyph, TagGlyph } from './FieldGlyphs';
 import { projectTone } from '../models/projectAppearance';
 import { PressableScale } from './PressableScale';
 import { PanelBox, PanelTitle } from './SheetPanel';
+import { displayNameOf } from '../models/listName';
 
 interface ListPanelProps {
   copy: TaskCopy;
@@ -58,7 +59,7 @@ export function ListPanel({
           return (
             <Option
               $active={isChosen}
-              accessibilityLabel={list.name}
+              accessibilityLabel={displayNameOf(list, copy)}
               accessibilityState={{ selected: isChosen }}
               key={list.id}
               onPress={() => onSelect(list.id)}
@@ -68,7 +69,9 @@ export function ListPanel({
                 color={projectTone(theme, list.color)}
                 icon={list.icon}
               />
-              <OptionText $active={isChosen}>{list.name}</OptionText>
+              <OptionText $active={isChosen}>
+                {displayNameOf(list, copy)}
+              </OptionText>
             </Option>
           );
         })}

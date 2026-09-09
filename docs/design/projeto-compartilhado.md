@@ -77,7 +77,7 @@ Funções puras novas, no mesmo arquivo, testáveis sem React e sem rede:
 | `canEdit(list, personId)`                           | Sem `share`, o dono local pode tudo. Com `share`, `owner` e `editor` editam.             |
 | `memberInitials(name)`                              | Duas letras, maiúsculas, sem acento — reuse `stripAccents`, que já existe aqui.          |
 | `withMember(list, member)` / `withoutMember(...)`   | Devolvem lista nova; nunca mutam.                                                        |
-| `canShare(list)`                                    | `false` para `INBOX_LIST_ID`: a Caixa é a caixa de uma pessoa, e compartilhá-la não faz sentido. |
+| `canShare(list)`                                    | `false` para `INBOX_LIST_ID`: a lista Avulsas é a caixa de uma pessoa, e compartilhá-la não faz sentido. |
 
 `sanitizeLists` precisa sanear `share` com o mesmo rigor que já aplica ao
 resto: entrada de disco é entrada não confiável — `token` string não vazia,
@@ -185,7 +185,7 @@ paridade entre `pt-BR` e `en-US`.
 5. **Sem rede** — a folha abre com o que está em disco e o botão de criar link
    fica desabilitado com uma linha em `muted`; nada de _spinner_ infinito.
 6. **Projeto excluído pelo dono** — quem era membro recebe as tarefas movidas
-   para a Caixa, exatamente como `deleteList` já faz localmente
+   para Avulsas, exatamente como `deleteList` já faz localmente
    (`copy.lists.deleteDetail` continua verdadeira).
 
 ## Fase 2 — `5b`: o combinado do dia

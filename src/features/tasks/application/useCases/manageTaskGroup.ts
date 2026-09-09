@@ -48,7 +48,7 @@ function committed(workspace: Workspace, at: number): TaskEvent[] {
  *
  * The name has to be new inside that space and the icon is required, so a
  * group never arrives without the identity that is the whole point of it. The
- * Caixa is refused: it is where what has no space falls, not a place to
+ * Avulsas is refused: it is where what has no space falls, not a place to
  * organize in.
  */
 export function createTaskGroup(
@@ -152,7 +152,7 @@ export function editTaskGroup(
  * Removing a group never removes its work.
  *
  * The tasks stay in the space and go back to being loose lines, the same way
- * deleting a space returns its tasks to the Caixa. Losing eight tasks because
+ * deleting a space returns its tasks to Avulsas. Losing eight tasks because
  * the block around them was deleted would be a very expensive tap.
  */
 export function deleteTaskGroup(

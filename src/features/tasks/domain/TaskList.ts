@@ -113,7 +113,7 @@ export function isShared(list: TaskList): boolean {
   return list.share != null && list.share.members.length > 1;
 }
 
-/** The Caixa is one person's inbox; sharing it would not mean anything. */
+/** Avulsas is one person's inbox; sharing it would not mean anything. */
 export function canShare(list: TaskList): boolean {
   return list.id !== INBOX_LIST_ID;
 }
@@ -192,8 +192,16 @@ export function withoutMember(list: TaskList, personId: string): TaskList {
 export const INBOX_LIST_ID = 'inbox';
 
 export const DEFAULT_LISTS: readonly TaskList[] = [
-  { id: INBOX_LIST_ID, name: 'Caixa', color: 'sun', icon: 'inbox' },
+  { id: INBOX_LIST_ID, name: 'Avulsas', color: 'sun', icon: 'inbox' },
 ];
+
+/** Every name the inbox answers to when typed: the current one, the English
+ * one, and the one it had before 1.4, which people who learned it keep using. */
+export const INBOX_NAMES: readonly string[] = ['Avulsas', 'Inbox', 'Caixa'];
+
+function isInboxName(normalized: string): boolean {
+  return INBOX_NAMES.some(name => normalizeListName(name) === normalized);
+}
 
 export function findListByName(
   lists: readonly TaskList[],
@@ -203,7 +211,13 @@ export function findListByName(
 
   const wanted = normalizeListName(name);
 
-  return lists.find(list => normalizeListName(list.name) === wanted) ?? null;
+  return (
+    lists.find(list =>
+      list.id === INBOX_LIST_ID
+        ? isInboxName(wanted)
+        : normalizeListName(list.name) === wanted,
+    ) ?? null
+  );
 }
 
 export function findListById(
@@ -323,7 +337,9 @@ export function sanitizeLists(value: unknown): TaskList[] {
     seen.add(id);
     lists.push({
       id,
-      name,
+      // The inbox keeps the name the app gives it now, so nothing downstream
+      // has to know what an older version called it.
+      name: id === INBOX_LIST_ID ? DEFAULT_LISTS[0].name : name,
       color: listColors.includes(candidate.color as ListColor)
         ? (candidate.color as ListColor)
         : 'sun',
@@ -332,10 +348,10 @@ export function sanitizeLists(value: unknown): TaskList[] {
         : id === INBOX_LIST_ID
         ? 'inbox'
         : DEFAULT_PROJECT_ICON,
-      // The Caixa is a single person's inbox; a `share` on it is discarded
+      // Avulsas is a single person's inbox; a `share` on it is discarded
       // rather than sanitized, so it can never surface as shareable.
       share: id === INBOX_LIST_ID ? undefined : sanitizeShare(candidate.share),
-      // The Caixa is where what has no space falls; giving it groups would
+      // Avulsas is where what has no space falls; giving it groups would
       // make the safety net a place to organize in.
       groups: id === INBOX_LIST_ID ? [] : sanitizeGroups(candidate.groups, id),
     });

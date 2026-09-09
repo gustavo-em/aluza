@@ -3,6 +3,7 @@ import { isOpen, type Task } from '../../domain/Task';
 import type { TaskList } from '../../domain/TaskList';
 import type { AppLanguage, TaskCopy } from '../localization/taskCopy';
 import { deadlineSections, type DeadlineSection } from './deadlineSections';
+import { displayNameOf } from './listName';
 
 export type HomeGrouping = 'deadline' | 'list' | 'priority';
 
@@ -121,7 +122,7 @@ function listSection(
 
   return {
     id: `list-${found.list.id}`,
-    title: found.list.name,
+    title: displayNameOf(found.list, copy),
     order: found.index,
     project: { color: found.list.color, icon: found.list.icon },
   };

@@ -314,6 +314,9 @@ export interface TaskCopy {
     indexSharedSection: string;
     indexOwnSection: string;
     indexSpaceCount: (count: number) => string;
+    /** What the inbox is called on screen: the one list whose name the app
+     * owns, so it is never read from disk. */
+    inboxName: string;
     indexInboxFact: (open: number) => string;
     indexOpenCount: (open: number) => string;
     indexInFocus: (name: string) => string;
@@ -714,7 +717,7 @@ const ptBR: TaskCopy = {
     collapseProject: name => `Fechar espaço ${name}`,
     delete: 'Excluir',
     deleteConfirm: name => `Excluir “${name}”?`,
-    deleteDetail: 'As tarefas serão movidas para Caixa; nada será apagado.',
+    deleteDetail: 'As tarefas serão movidas para Avulsas; nada será apagado.',
     color: 'Cor',
     icon: 'Símbolo',
     appearance: 'Símbolo e cor',
@@ -743,7 +746,7 @@ const ptBR: TaskCopy = {
       cake: 'Aniversário',
       gift: 'Presente',
       tools: 'Reforma',
-      inbox: 'Caixa',
+      inbox: 'Avulsas',
     },
     share: 'Compartilhar',
     shareHint:
@@ -839,6 +842,7 @@ const ptBR: TaskCopy = {
     indexSharedSection: 'Compartilhados',
     indexOwnSection: 'Só seus',
     indexSpaceCount: count => (count === 1 ? '1 espaço' : `${count} espaços`),
+    inboxName: 'Avulsas',
     indexInboxFact: open =>
       `Tarefas sem espaço · ${open} ${open === 1 ? 'aberta' : 'abertas'}`,
     indexOpenCount: open => `${open} ${open === 1 ? 'aberta' : 'abertas'}`,
@@ -1379,6 +1383,7 @@ const enUS: TaskCopy = {
     indexSharedSection: 'Shared',
     indexOwnSection: 'Just yours',
     indexSpaceCount: count => (count === 1 ? '1 space' : `${count} spaces`),
+    inboxName: 'Inbox',
     indexInboxFact: open => `Tasks without a space · ${open} open`,
     indexOpenCount: open => `${open} open`,
     indexInFocus: name => `${name} in focus`,

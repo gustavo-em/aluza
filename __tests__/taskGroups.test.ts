@@ -103,7 +103,7 @@ describe('task groups inside a space', () => {
     expect(duplicate.events).toEqual([]);
   });
 
-  it('refuses a group in the Caixa, which is a safety net and not a place', () => {
+  it('refuses a group in Avulsas, which is a safety net and not a place', () => {
     const result = createTaskGroup(
       EMPTY_WORKSPACE,
       'inbox',
@@ -449,9 +449,9 @@ describe('task groups inside a space', () => {
     expect(isLooseInSpace(taskIn('t1', null, null), [group])).toBe(true);
   });
 
-  it('never lets the Caixa carry groups, however they arrived', () => {
+  it('never lets Avulsas carry groups, however they arrived', () => {
     const lists = sanitizeLists([
-      { id: 'inbox', name: 'Caixa', groups: [{ id: 'g', name: 'Festa' }] },
+      { id: 'inbox', name: 'Avulsas', groups: [{ id: 'g', name: 'Festa' }] },
       { id: 'familia', name: 'Família', groups: [{ id: 'g', name: 'Festa' }] },
     ]);
 

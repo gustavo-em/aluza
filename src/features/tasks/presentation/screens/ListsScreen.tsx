@@ -79,6 +79,7 @@ import { SharedDayBand } from '../views/SharedDayBand';
 import { ShareSheet } from '../views/ShareSheet';
 import { TaskCheckbox } from '../views/TaskCheckbox';
 import { TaskRow } from '../views/TaskRow';
+import { displayNameOf } from '../models/listName';
 
 interface ListsScreenProps {
   /** Somebody asked for an invite on the walk-through and has just signed in:
@@ -796,7 +797,7 @@ export function ListsScreen({
           lists={viewModel.lists}
           nowMs={viewModel.nowMs}
           onCancel={() => setCapturingForList(null)}
-          /* The Caixa holds no groups, so the third segment is not offered
+          /* Avulsas holds no groups, so the third segment is not offered
              there: an option that refuses is worse than no option. */
           onChooseGroup={
             capturingForList.id === INBOX_LIST_ID
@@ -1424,9 +1425,10 @@ const ProjectBlock = memo(function ProjectBlockView({
       return (
         <InboxCard entering={rowEnter(index)}>
           <InboxRow
-            accessibilityLabel={`${list.name}, ${copy.lists.indexInboxFact(
-              openCount,
-            )}`}
+            accessibilityLabel={`${displayNameOf(
+              list,
+              copy,
+            )}, ${copy.lists.indexInboxFact(openCount)}`}
             accessibilityRole="button"
             onPress={handleToggleOpen}
             scaleTo={0.99}
@@ -1440,7 +1442,7 @@ const ProjectBlock = memo(function ProjectBlockView({
               />
             </InboxBadge>
             <RowTexts>
-              <RowName numberOfLines={1}>{list.name}</RowName>
+              <RowName numberOfLines={1}>{displayNameOf(list, copy)}</RowName>
               <RowFact numberOfLines={1}>
                 {copy.lists.indexInboxFact(openCount)}
               </RowFact>
@@ -1514,7 +1516,7 @@ const ProjectBlock = memo(function ProjectBlockView({
               />
             </RowBadge>
             <RowTexts>
-              <RowName numberOfLines={1}>{list.name}</RowName>
+              <RowName numberOfLines={1}>{displayNameOf(list, copy)}</RowName>
               {fact}
             </RowTexts>
             <RowSlot>
@@ -1577,7 +1579,7 @@ const ProjectBlock = memo(function ProjectBlockView({
       <SpaceHeader>
         <SpaceTitles>
           <SpaceName accessibilityRole="header" numberOfLines={2}>
-            {list.name}
+            {displayNameOf(list, copy)}
           </SpaceName>
           {/* "Só você · 1 aberta" was a sentence about people with nobody
               in it. The fichas of whoever is in the space go in front of the
@@ -1774,7 +1776,7 @@ const ProjectBlock = memo(function ProjectBlockView({
           </AddTaskButton>
           {/* The second way in, beside the first rather than behind a menu:
               a space holds tasks and groups, and both are made from here. The
-              Caixa is where what has no space falls, so it never offers it. */}
+              Avulsas is where what has no space falls, so it never offers it. */}
           {list.id === INBOX_LIST_ID ? null : (
             <AddGroupButton
               accessibilityLabel={copy.lists.groups.newGroup}
