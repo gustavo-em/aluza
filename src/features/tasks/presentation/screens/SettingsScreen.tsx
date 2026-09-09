@@ -3,14 +3,14 @@ import Animated from 'react-native-reanimated';
 import styled from 'styled-components/native';
 
 import { contentEnter } from '../../../../app/animation/motion';
-import { dayCapacities } from '../../../../app/domain/AppPreferences';
+import {
+  dayCapacities,
+  languageChoices,
+  type LanguageChoice,
+} from '../../../../app/domain/AppPreferences';
 import type { AppearanceMode } from '../../../../app/theme/theme';
 import type { AuthCopy } from '../../../auth/presentation/localization/authCopy';
-import {
-  appLanguages,
-  type AppLanguage,
-  type TaskCopy,
-} from '../localization/taskCopy';
+import type { AppLanguage, TaskCopy } from '../localization/taskCopy';
 import { PressableScale } from '../views/PressableScale';
 
 interface SettingsScreenProps {
@@ -18,7 +18,8 @@ interface SettingsScreenProps {
   appearanceMode: AppearanceMode;
   copy: TaskCopy;
   dayCapacity: number;
-  language: AppLanguage;
+  /** One of the app's languages, or the phone's. */
+  languageChoice: LanguageChoice;
   /** The uid: with no account there is nothing to sign out of. */
   personId: string | null;
   version: string;
@@ -31,7 +32,7 @@ interface SettingsScreenProps {
   onOpenNotificationSettings: () => void;
   onAppearanceModeChange: (mode: AppearanceMode) => void;
   onDayCapacityChange: (capacity: number) => void;
-  onLanguageChange: (language: AppLanguage) => void;
+  onLanguageChange: (choice: LanguageChoice) => void;
   onSignOut: () => void;
   /** Opens the account's own last door. Red, and the very last line: it is
    * the only setting here that destroys anything. */
@@ -40,10 +41,19 @@ interface SettingsScreenProps {
   onReplayOnboarding: () => void;
 }
 
+/** Each language in its own name, so a person finds theirs whatever the app
+ * happens to be speaking. Only the phone's option is said in the current
+ * language. */
 const LANGUAGE_NAMES: Record<AppLanguage, string> = {
   'pt-BR': 'Português',
   'en-US': 'English',
 };
+
+function languageName(choice: LanguageChoice, copy: TaskCopy): string {
+  return choice === 'system'
+    ? copy.settings.languageSystem
+    : LANGUAGE_NAMES[choice];
+}
 
 /**
  * Every adjustment the app has, in one white card.
@@ -57,7 +67,7 @@ export function SettingsScreen({
   appearanceMode,
   copy,
   dayCapacity,
-  language,
+  languageChoice,
   personId,
   version,
   projectActivityNotifications,
@@ -147,18 +157,18 @@ export function SettingsScreen({
           <Row>
             <RowLabel>{copy.settings.language}</RowLabel>
             <Segmented>
-              {appLanguages.map(option => (
+              {languageChoices.map(option => (
                 <Segment
-                  $active={language === option}
-                  accessibilityLabel={LANGUAGE_NAMES[option]}
+                  $active={languageChoice === option}
+                  accessibilityLabel={languageName(option, copy)}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: language === option }}
+                  accessibilityState={{ selected: languageChoice === option }}
                   key={option}
                   onPress={() => onLanguageChange(option)}
                   testID={`language-${option}`}
                 >
-                  <SegmentText $active={language === option}>
-                    {LANGUAGE_NAMES[option]}
+                  <SegmentText $active={languageChoice === option}>
+                    {languageName(option, copy)}
                   </SegmentText>
                 </Segment>
               ))}

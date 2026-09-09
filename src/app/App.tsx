@@ -415,7 +415,7 @@ function AppContent({
                 appearanceMode={app.appearanceMode}
                 copy={app.copy}
                 dayCapacity={app.dayCapacity}
-                language={app.language}
+                languageChoice={app.languageChoice}
                 onAppearanceModeChange={app.changeAppearanceMode}
                 onDayCapacityChange={app.changeDayCapacity}
                 onLanguageChange={app.changeLanguage}

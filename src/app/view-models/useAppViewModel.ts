@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import type { TaskEventBus } from '../../features/tasks/domain/TaskEvent';
-import {
-  getTaskCopy,
-  type AppLanguage,
-} from '../../features/tasks/presentation/localization/taskCopy';
+import { getTaskCopy } from '../../features/tasks/presentation/localization/taskCopy';
 import type { PreferencesStore } from '../application/ports/PreferencesStore';
 import {
   DEFAULT_APP_PREFERENCES,
   sanitizeAppPreferences,
   type AppPreferences,
+  type LanguageChoice,
 } from '../domain/AppPreferences';
-import { matchAppLanguage } from '../infrastructure/locale/deviceLanguage';
+import {
+  languageOf,
+  resolveDeviceLanguage,
+} from '../infrastructure/locale/deviceLanguage';
 import type { AppTab } from '../navigation/AppTab';
 import type { AppearanceMode } from '../theme/theme';
 
@@ -28,19 +30,28 @@ export function useAppViewModel(
   bus: TaskEventBus,
 ) {
   const [activeTab, setActiveTab] = useState<AppTab>('today');
-  const [preferences, setPreferences] = useState<AppPreferences>(() => {
-    // The app opens in the language the phone is already set to, so the first
-    // screen is readable before anybody has been asked anything.
-    const deviceLanguage = matchAppLanguage();
-
-    return deviceLanguage == null
-      ? DEFAULT_APP_PREFERENCES
-      : { ...DEFAULT_APP_PREFERENCES, language: deviceLanguage };
-  });
+  const [preferences, setPreferences] = useState<AppPreferences>(
+    DEFAULT_APP_PREFERENCES,
+  );
+  // The language the phone is set to. Read at launch, so the first screen is
+  // readable before anybody has been asked anything, and read again whenever
+  // the app comes back to the front: Android keeps the JavaScript alive
+  // across a change in the system settings, so launch alone would miss it.
+  const [deviceLanguage, setDeviceLanguage] = useState(() =>
+    resolveDeviceLanguage(),
+  );
   // Nothing is rendered until preferences are back, so the theme never flashes
   // from one to the other on launch.
   const [isRestored, setIsRestored] = useState(false);
   const hasSettledAfterRestore = useRef(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') setDeviceLanguage(resolveDeviceLanguage());
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
@@ -95,13 +106,19 @@ export function useAppViewModel(
     [],
   );
 
+  // "System" is whatever the phone says, now and after the phone changes its
+  // mind; an explicit choice holds whatever the phone says.
+  const language = languageOf(preferences, deviceLanguage);
+
   return {
     activeTab,
     selectTab: useCallback((tab: AppTab) => setActiveTab(tab), []),
     appearanceMode: preferences.appearanceMode,
-    language: preferences.language,
+    /** The language every screen speaks, with "system" already resolved. */
+    language,
+    languageChoice: preferences.languageChoice,
     dayCapacity: preferences.dayCapacity,
-    copy: getTaskCopy(preferences.language),
+    copy: getTaskCopy(language),
     hasSeenOnboarding: preferences.hasSeenOnboarding,
     projectActivityNotifications: preferences.projectActivityNotifications,
     hasAskedActivityPermission: preferences.hasAskedActivityPermission,
@@ -111,7 +128,7 @@ export function useAppViewModel(
       [update],
     ),
     changeLanguage: useCallback(
-      (language: AppLanguage) => update('language', language),
+      (choice: LanguageChoice) => update('languageChoice', choice),
       [update],
     ),
     changeDayCapacity: useCallback(

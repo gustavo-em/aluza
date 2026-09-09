@@ -7,7 +7,7 @@ describe('app preferences', () => {
   it('keeps what was stored when it is a value the app offers', () => {
     const stored = {
       appearanceMode: 'dark',
-      language: 'en-US',
+      languageChoice: 'en-US',
       dayCapacity: 5,
       hasSeenOnboarding: true,
       projectActivityNotifications: false,
@@ -28,7 +28,7 @@ describe('app preferences', () => {
   it('falls back for anything it does not recognise', () => {
     const stored = {
       appearanceMode: 'sepia',
-      language: 'fr-FR',
+      languageChoice: 'fr-FR',
       dayCapacity: 9,
       hasSeenOnboarding: 'sim',
     };
@@ -37,17 +37,27 @@ describe('app preferences', () => {
   });
 
   it('reads a corrupted payload as the defaults it was given', () => {
-    const defaults = { ...DEFAULT_APP_PREFERENCES, language: 'en-US' } as const;
+    const defaults = {
+      ...DEFAULT_APP_PREFERENCES,
+      languageChoice: 'en-US',
+    } as const;
 
     expect(sanitizeAppPreferences('nonsense', defaults)).toEqual(defaults);
     expect(sanitizeAppPreferences(null, defaults)).toEqual(defaults);
   });
 
-  it('keeps a device language that a stored choice has not overridden', () => {
-    const defaults = { ...DEFAULT_APP_PREFERENCES, language: 'en-US' } as const;
-
+  it('follows the phone until somebody chooses otherwise', () => {
+    expect(DEFAULT_APP_PREFERENCES.languageChoice).toBe('system');
     expect(
-      sanitizeAppPreferences({ appearanceMode: 'dark' }, defaults),
-    ).toEqual({ ...defaults, appearanceMode: 'dark' });
+      sanitizeAppPreferences({ appearanceMode: 'dark' }).languageChoice,
+    ).toBe('system');
+  });
+
+  it('starts an older install from the phone, whatever it had stored', () => {
+    // Earlier versions kept the language itself, and the app had chosen it on
+    // the first run at least as often as the person had.
+    expect(
+      sanitizeAppPreferences({ language: 'pt-BR', appearanceMode: 'dark' }),
+    ).toEqual({ ...DEFAULT_APP_PREFERENCES, appearanceMode: 'dark' });
   });
 });

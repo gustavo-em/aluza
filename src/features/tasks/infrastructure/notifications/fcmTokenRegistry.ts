@@ -10,6 +10,7 @@ import {
 import { Platform } from 'react-native';
 
 import { sanitizeAppPreferences } from '../../../../app/domain/AppPreferences';
+import { languageOf } from '../../../../app/infrastructure/locale/deviceLanguage';
 import { asyncStoragePreferencesStore } from '../../../../app/infrastructure/preferences/asyncStoragePreferencesStore';
 import { claimActivityKey } from '../../application/useCases/checkProjectActivity';
 import { firestoreDocument } from '../sharing/firestoreRest';
@@ -95,7 +96,7 @@ async function showPushedActivity(
 
   await presentActivityLine(
     { id: eventKey, token, title, body },
-    preferences.language,
+    languageOf(preferences),
   );
 }
 

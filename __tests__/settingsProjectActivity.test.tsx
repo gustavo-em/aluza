@@ -24,7 +24,7 @@ function renderSettings(
           appearanceMode="light"
           copy={getTaskCopy('pt-BR')}
           dayCapacity={3}
-          language="pt-BR"
+          languageChoice="pt-BR"
           onAppearanceModeChange={() => undefined}
           onDayCapacityChange={() => undefined}
           onDeleteAccount={() => undefined}

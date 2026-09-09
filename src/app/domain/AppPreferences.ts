@@ -1,16 +1,20 @@
-import {
-  appLanguages,
-  type AppLanguage,
-} from '../../features/tasks/presentation/localization/taskCopy';
+import { appLanguages } from '../../features/tasks/presentation/localization/taskCopy';
 import { appearanceModes, type AppearanceMode } from '../theme/theme';
 
 /** Three by default, five for a fuller day, or none at all. Zero means no
  * ceiling: everything still open belongs to today. */
 export const dayCapacities = [3, 5, 0] as const;
 
+/** What the person said about language: one of the app's own, or whatever the
+ * phone is set to. The phone's choice is the default, so nobody has to find a
+ * setting to read the first screen. */
+export const languageChoices = ['system', ...appLanguages] as const;
+
+export type LanguageChoice = (typeof languageChoices)[number];
+
 export interface AppPreferences {
   appearanceMode: AppearanceMode;
-  language: AppLanguage;
+  languageChoice: LanguageChoice;
   /** How many tasks the day screen commits to. */
   dayCapacity: number;
   /** False until the first run has been walked through or skipped, which is
@@ -27,7 +31,7 @@ export interface AppPreferences {
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {
   appearanceMode: 'light',
-  language: 'pt-BR',
+  languageChoice: 'system',
   dayCapacity: 3,
   hasSeenOnboarding: false,
   projectActivityNotifications: true,
@@ -46,6 +50,13 @@ function pick<T extends string>(
  * Stored preferences come off the device's disk, so they are treated as
  * untrusted input: an unknown value falls back to its default rather than
  * reaching the theme or the copy.
+ *
+ * Versions before 1.4 stored a resolved `language` instead of a choice, and
+ * the app had picked it on the first run at least as often as the person had
+ * — with Portuguese for every phone that was not in English. Nothing tells
+ * the two apart, so that key is left behind and everybody starts from the
+ * phone's language: the few who chose by hand choose once more, and everyone
+ * the old default had stuck in Portuguese is let out.
  */
 export function sanitizeAppPreferences(
   stored: unknown,
@@ -61,7 +72,11 @@ export function sanitizeAppPreferences(
       appearanceModes,
       defaults.appearanceMode,
     ),
-    language: pick(values.language, appLanguages, defaults.language),
+    languageChoice: pick(
+      values.languageChoice,
+      languageChoices,
+      defaults.languageChoice,
+    ),
     dayCapacity: dayCapacities.includes(values.dayCapacity as never)
       ? (values.dayCapacity as number)
       : defaults.dayCapacity,

@@ -4,6 +4,7 @@ import { getAuth } from '@react-native-firebase/auth';
 
 import { asyncStoragePreferencesStore } from '../../../../app/infrastructure/preferences/asyncStoragePreferencesStore';
 import { sanitizeAppPreferences } from '../../../../app/domain/AppPreferences';
+import { languageOf } from '../../../../app/infrastructure/locale/deviceLanguage';
 import { sweepProjectActivity } from '../../application/useCases/checkProjectActivity';
 import { sanitizeLists } from '../../domain/TaskList';
 import { createLocalTaskStores } from '../storage/asyncStorageStores';
@@ -73,7 +74,7 @@ export async function runActivitySweep(): Promise<number> {
   return sweepProjectActivity(lists, firestoreShareGateway, {
     ledger: asyncStorageActivityLedger,
     notifier: notifeeActivityNotifier,
-    language: preferences.language,
+    language: languageOf(preferences),
     meId: uid,
     enabled: true,
   });

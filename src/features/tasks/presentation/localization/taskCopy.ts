@@ -467,6 +467,8 @@ export interface TaskCopy {
     light: string;
     dark: string;
     language: string;
+    /** The option that follows the phone, next to the languages by name. */
+    languageSystem: string;
     about: string;
     version: (value: string) => string;
     replayOnboarding: string;
@@ -1003,6 +1005,7 @@ const ptBR: TaskCopy = {
     light: 'Claro',
     dark: 'Escuro',
     language: 'Idioma',
+    languageSystem: 'Sistema',
     about: 'Sobre',
     version: value => `Versão ${value}`,
     replayOnboarding: 'Ver a apresentação de novo',
@@ -1542,6 +1545,7 @@ const enUS: TaskCopy = {
     light: 'Light',
     dark: 'Dark',
     language: 'Language',
+    languageSystem: 'System',
     about: 'About',
     version: value => `Version ${value}`,
     replayOnboarding: 'See the walk-through again',
