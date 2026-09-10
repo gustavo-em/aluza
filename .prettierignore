@@ -3,3 +3,6 @@ ios/
 vendor/
 node_modules/
 docs/design/
+
+# Cache de ferramenta, gerado e fora do git: formatar não faz sentido.
+.impeccable/
