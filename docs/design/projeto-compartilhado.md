@@ -223,6 +223,30 @@ está em foco, fechada ou nem começou.
 | 10  | `npm run validate`                                      | Formatação, lint, tipos, testes.                                      |
 | 11  | `docs/adr/`                                             | ADR curta: por que o placar não é do grupo. É a decisão que alguém vai querer reverter em seis meses. |
 
+## O que o push escreve (e o que ele apaga sem querer)
+
+A escrita de conteúdo do espaço é um `PATCH` REST com `updateMask`. A regra do
+Firestore é dura: **campo citado na máscara e ausente do corpo é apagado**, e
+campo fora da máscara fica como está. Foi assim que os grupos sumiram — a
+máscara pedia `groups`, o corpo não mandava, e todo push do dono limpava os
+grupos do espaço no servidor. Do outro lado, `groups` ausente é lido como
+"cliente antigo, não mexa", então a outra pessoa nunca via o grupo e a tarefa
+dele caía na lista solta.
+
+Máscara e corpo agora saem do mesmo lugar, `infrastructure/sharing/sharePushWrite.ts`,
+usado pelo gateway REST e pelo duplo de teste — que também apaga o que a máscara
+cita e o corpo não traz, para o teste não ser mais gentil que o servidor. Campo
+novo entra nos dois de uma vez, ou os testes reprovam.
+
+Um espaço que já perdeu `groups` no servidor se conserta sozinho: basta quem
+tem os grupos no aparelho abrir o app e mexer no espaço; o push seguinte
+reescreve o campo e a outra pessoa recebe tudo no pull. Não há migração.
+
+Ponto frágil vizinho, registrado de propósito: `acceptInvite` sufixa `task.id`
+com `@<token4>` para não colidir com o que já existe no aparelho, e **não**
+sufixa `groupId`. Funciona porque `sanitizeGroups` preserva o id do grupo como
+veio do servidor; quem mexer em um dos dois tem que olhar o outro.
+
 ## Decisões abertas
 
 1. **Link aberto ou convite por pessoa?** Link é 10 segundos de atrito e casa

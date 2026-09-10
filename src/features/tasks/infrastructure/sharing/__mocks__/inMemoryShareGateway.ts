@@ -7,6 +7,11 @@ import {
   withAssignments,
   type AssignmentMap,
 } from '../../../domain/TaskAssignment';
+import {
+  applyUpdateMask,
+  sharePushBody,
+  SHARE_PUSH_MASK,
+} from '../sharePushWrite';
 
 /**
  * A `ShareGateway` that keeps everything in memory, for tests and stories.
@@ -100,8 +105,33 @@ export function createInMemoryShareGateway(): ShareGateway {
       const project = projects.get(share.token);
       if (project == null) return;
 
-      project.list = { ...list, share: project.list.share };
-      project.tasks = [...tasks];
+      // Same mask and same body the REST gateway sends, then the same rule
+      // the server applies to them: a field named in the mask and missing
+      // from the body is **erased**, a field outside the mask is preserved.
+      // Storing `list` whole made this double kinder than Firestore, and a
+      // push that deleted `groups` on the server looked perfect in tests.
+      const stored = applyUpdateMask(
+        project.list as unknown as Record<string, unknown>,
+        sharePushBody(list, [...tasks], Date.now()),
+        SHARE_PUSH_MASK,
+      );
+
+      const storedTasks = Array.isArray(stored.tasks)
+        ? (stored.tasks as Task[])
+        : [];
+      // The document keeps tasks and `updatedAtMs` beside the space, not
+      // inside it, the same way the remote document does.
+      delete stored.tasks;
+      delete stored.updatedAtMs;
+
+      // `id` and `share` are the document's identity here, not content: no
+      // content write claims them, so the push never touches them.
+      project.list = {
+        ...(stored as unknown as TaskList),
+        id: project.list.id,
+        share: project.list.share,
+      };
+      project.tasks = storedTasks;
     },
 
     async publishDay(share, day) {

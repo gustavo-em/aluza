@@ -28,6 +28,7 @@ import {
   firestoreDocument,
   type FirestoreValue,
 } from './firestoreRest';
+import { SHARE_PUSH_MASK, sharePushBody } from './sharePushWrite';
 
 const COLLECTION = 'sharedLists';
 /** Subcollection holding one document per day of a shared project. */
@@ -463,14 +464,11 @@ export const firestoreShareGateway: ShareGateway = {
   async push(share, list, tasks) {
     await firestoreDocument(`${COLLECTION}/${share.token}`, {
       method: 'PATCH',
-      updateMask: ['name', 'color', 'icon', 'groups', 'tasks', 'updatedAtMs'],
-      fields: {
-        name: list.name,
-        color: list.color,
-        icon: list.icon,
-        tasks: tasks.map(taskToRecord),
-        updatedAtMs: Date.now(),
-      },
+      // Mask and body come from the same builder: a path claimed here and
+      // left out of the body is erased on the server, which is how the
+      // groups of a shared space used to disappear on every push.
+      updateMask: SHARE_PUSH_MASK,
+      fields: sharePushBody(list, tasks.map(taskToRecord), Date.now()),
     });
   },
 
