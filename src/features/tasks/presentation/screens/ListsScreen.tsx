@@ -1,15 +1,25 @@
 import {
   memo,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ComponentRef,
 } from 'react';
-import { AppState, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import {
+  AccessibilityInfo,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
+
+import { useInvitePreview } from '../../../auth/presentation/view-models/useInvitePreview';
 
 import {
   disclosureEnter,
@@ -69,6 +79,10 @@ import { FloatingAction } from '../views/FloatingAction';
 import { GroupBlock } from '../views/GroupBlock';
 import { GroupEditorSheet, type GroupDraft } from '../views/GroupEditorSheet';
 import { GroupScreen } from '../views/GroupScreen';
+import {
+  InvitePreviewSheet,
+  type InvitePreviewMode,
+} from '../views/InvitePreviewSheet';
 import { JoinInviteSheet } from '../views/JoinInviteSheet';
 import { ProjectEditorSheet } from '../views/ListNameSheet';
 import { MemberChip } from '../views/MemberChip';
@@ -143,6 +157,25 @@ function nextGroupColor(groups: readonly TaskGroup[]): ListColor {
 /** Past this many people on one task, the rest reads as `+N`. */
 const ASSIGNEE_CAP = 3;
 
+/** Long enough to be read after the space has taken the screen, short enough
+ * that it never becomes furniture. */
+const JOINED_NOTICE_MS = 3200;
+
+/**
+ * Whether a project on this device is the one a link points at.
+ *
+ * The token is the first answer, but a project whose sharing was stopped after
+ * this device joined has no `share` left to match on — and `acceptInvite`
+ * refuses to add a second copy of it. Its local id still carries the token it
+ * arrived under, so that is the second answer, and without it a join that
+ * succeeded left the sheet waiting for a project that was never going to come.
+ */
+function matchesInviteToken(list: TaskList, token: string): boolean {
+  return (
+    list.share?.token === token || list.id.endsWith(`@${token.slice(0, 4)}`)
+  );
+}
+
 /** A heading that never collapses still asks for a handler, and a reminder row
  * has nothing to tick. */
 const noop = () => undefined;
@@ -172,6 +205,9 @@ export function ListsScreen({
   viewModel,
 }: ListsScreenProps) {
   const theme = useTheme();
+  // Read from the context rather than the hook: the hook throws where there is
+  // no provider, and the notice is not worth taking a screen down for.
+  const insets = useContext(SafeAreaInsetsContext);
   useRenderCount('ListsScreen');
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const [openListId, setOpenListId] = useState<string | null>(null);
@@ -221,6 +257,19 @@ export function ListsScreen({
   const [pendingShare, setPendingShare] = useState<TaskList | null>(null);
   const [leavingList, setLeavingList] = useState<TaskList | null>(null);
   const [joiningInvite, setJoiningInvite] = useState(false);
+  // The token a tapped link arrived with, kept here after the source has been
+  // cleared: the sheet outlives the delivery, and only one sheet exists.
+  const [invitePreviewToken, setInvitePreviewToken] = useState<string | null>(
+    null,
+  );
+  // Set while a join is on its way. The space is opened by the project landing
+  // on this device, never by the call returning: `joinSharedList` resolves
+  // before the workspace has the list, and reading it from the closure gave a
+  // list that was not there yet.
+  const [joinedToken, setJoinedToken] = useState<string | null>(null);
+  // The word said once the space is open: entering has to be visible, and the
+  // sheet closing is not by itself an answer.
+  const [joinedNotice, setJoinedNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Answered on this screen, so the line leaves the moment it is used and does
   // not wait for the setting to come back from storage.
@@ -256,33 +305,129 @@ export function ListsScreen({
   // clean phone the link is what started the install, and there is a sign-in
   // between the tap and this screen.
   //
-  // Tapping the link is the answer, so the space is joined on arrival. Showing
-  // the token in a field and asking for a second confirmation made somebody
-  // re-approve a decision they had already made, in the one place where the
-  // app knows exactly what they meant.
-  //
-  // The sheet is kept for the failure: a link that is expired, refused or
-  // simply offline needs somewhere to say so, and somewhere to try again from.
+  // Joining on arrival is what made a tapped link do nothing anybody could
+  // see: the workspace moved underneath the person, and a link to a space they
+  // were already in did not even do that. The token opens the preview sheet
+  // instead — who invited, which space, how many people — and entering stays a
+  // choice with somewhere to say no.
   const { joinSharedList } = viewModel;
+  const dismissJoinError = viewModel.dismissJoinError;
+  // The token the sheet is currently asking about. Kept in a ref because a
+  // join already on its way has to be able to tell whether the answer it comes
+  // back with is still wanted: cancelling has to mean cancelled.
+  const activeInviteToken = useRef<string | null>(null);
 
   useEffect(() => {
     if (incomingInviteToken == null) return;
     if (!viewModel.isRestored || personId == null) return;
 
     const token = incomingInviteToken;
-    // Taken before the request so a slow network cannot replay it.
+    // Taken before anything else: the source drops the token here, so turning
+    // the phone or coming back from the background cannot replay it.
     onIncomingInviteHandled?.();
 
-    joinSharedList(token).then(joined => {
-      if (!joined) setJoiningInvite(true);
-    });
+    // The same link tapped twice in a row is already answered by the sheet on
+    // screen, and a second one must not stack on it. Another link is another
+    // question, though: the sheet moves to it rather than swallowing it.
+    if (activeInviteToken.current === token) return;
+
+    activeInviteToken.current = token;
+    setInvitePreviewToken(token);
+    setJoinedToken(null);
+    dismissJoinError();
   }, [
+    dismissJoinError,
     incomingInviteToken,
-    joinSharedList,
     onIncomingInviteHandled,
     personId,
     viewModel.isRestored,
   ]);
+
+  // The same reading the entrance does before there is an account, asked here
+  // for somebody who already has one. One way in for an invite, not two.
+  const invitePreview = useInvitePreview(invitePreviewToken);
+
+  // A space this device already holds under the link's own token. Decided
+  // locally and answered at once: somebody who is already in does not wait on
+  // the network to be told so.
+  const alreadyInList = useMemo(
+    () =>
+      invitePreviewToken == null
+        ? null
+        : viewModel.lists.find(list =>
+            matchesInviteToken(list, invitePreviewToken),
+          ) ?? null,
+    [invitePreviewToken, viewModel.lists],
+  );
+
+  const invitePreviewMode: InvitePreviewMode =
+    alreadyInList != null
+      ? 'already'
+      : invitePreview.status === 'gone'
+      ? 'invalid'
+      : invitePreview.status === 'loading'
+      ? 'loading'
+      : 'ready';
+
+  const closeInvitePreview = useCallback(() => {
+    activeInviteToken.current = null;
+    setInvitePreviewToken(null);
+    setJoinedToken(null);
+    dismissJoinError();
+  }, [dismissJoinError]);
+
+  const confirmInvitePreview = useCallback(() => {
+    if (invitePreviewToken == null) return;
+
+    const token = invitePreviewToken;
+
+    joinSharedList(token).then(joined => {
+      // Cancelled while the request was out, or moved on to another link: an
+      // answer nobody is waiting for does not open a space.
+      if (activeInviteToken.current !== token) return;
+      // A refusal keeps the sheet where it is, with the reason on it; the
+      // arrival of the project is what closes it.
+      if (joined) setJoinedToken(token);
+    });
+  }, [invitePreviewToken, joinSharedList]);
+
+  const openInvitedSpace = useCallback(() => {
+    if (alreadyInList == null) return;
+
+    const target = alreadyInList;
+    closeInvitePreview();
+    setOpenGroupId(null);
+    setOpenListId(target.id);
+  }, [alreadyInList, closeInvitePreview]);
+
+  // The project asked for has landed: the sheet goes, the space opens, and the
+  // entry is said out loud instead of being left to the change of screen.
+  useEffect(() => {
+    if (joinedToken == null) return;
+
+    const joined = viewModel.lists.find(list =>
+      matchesInviteToken(list, joinedToken),
+    );
+    if (joined == null) return;
+
+    activeInviteToken.current = null;
+    setInvitePreviewToken(null);
+    setJoinedToken(null);
+    setOpenGroupId(null);
+    setOpenListId(joined.id);
+    setJoinedNotice(copy.lists.joinedNotice(displayNameOf(joined, copy)));
+  }, [copy, joinedToken, viewModel.lists]);
+
+  useEffect(() => {
+    if (joinedNotice == null) return;
+
+    // The announcement alone: it covers both platforms, and pairing it with a
+    // live region made Android read the same line twice.
+    AccessibilityInfo.announceForAccessibility(joinedNotice);
+    const timer = setTimeout(() => setJoinedNotice(null), JOINED_NOTICE_MS);
+
+    return () => clearTimeout(timer);
+  }, [joinedNotice]);
 
   // The invite asked for before the account, made the moment there is one: a
   // space named after the Casa template, already shared, with the sheet open on
@@ -671,6 +816,16 @@ export function ListsScreen({
 
   return (
     <Screen>
+      {joinedNotice == null ? null : (
+        <JoinedNotice
+          entering={fadeEnter()}
+          pointerEvents="none"
+          style={{ top: (insets?.top ?? 0) + 8 }}
+          testID="invite-joined-notice"
+        >
+          <JoinedNoticeText>{joinedNotice}</JoinedNoticeText>
+        </JoinedNotice>
+      )}
       <Content
         contentContainerStyle={
           openList != null ? styles.scroll : styles.scrollIndex
@@ -1104,6 +1259,24 @@ export function ListsScreen({
           }
           personId={personId ?? ''}
           status={viewModel.shareStatus}
+        />
+      )}
+      {invitePreviewToken == null ? null : (
+        <InvitePreviewSheet
+          copy={copy}
+          invitedBy={invitePreview.preview?.invitedBy ?? null}
+          joinErrorKind={viewModel.joinErrorKind}
+          joinStatus={viewModel.joinStatus}
+          memberCount={invitePreview.preview?.memberCount ?? 0}
+          mode={invitePreviewMode}
+          onCancel={closeInvitePreview}
+          onJoin={confirmInvitePreview}
+          onOpenSpace={openInvitedSpace}
+          spaceName={
+            alreadyInList != null
+              ? displayNameOf(alreadyInList, copy)
+              : invitePreview.preview?.name ?? null
+          }
         />
       )}
       {!joiningInvite ? null : (
@@ -1890,6 +2063,26 @@ const Screen = styled.View`
 const Content = styled.ScrollView`
   flex: 1;
   padding: 0px ${({ theme }) => theme.spacing.large}px;
+`;
+
+/* The word that follows an invite in: a strip over the space that just
+   opened, gone before it becomes furniture. Not a card — the space behind it
+   is already made of those. */
+const JoinedNotice = styled(Animated.View)`
+  position: absolute;
+  left: ${({ theme }) => theme.spacing.large}px;
+  right: ${({ theme }) => theme.spacing.large}px;
+  z-index: 30;
+  background-color: ${({ theme }) => theme.colors.cardNeutral};
+  border-radius: ${({ theme }) => theme.radii.medium}px;
+  padding: ${({ theme }) => theme.spacing.small + 2}px
+    ${({ theme }) => theme.spacing.medium}px;
+`;
+
+const JoinedNoticeText = styled.Text`
+  color: ${({ theme }) => theme.colors.accentInk};
+  font-size: ${({ theme }) => theme.type.label}px;
+  font-weight: 700;
 `;
 /* A line of type, not a box: the ask sits in the flow of the screen, with a
    thin rule under it and no card of its own. */

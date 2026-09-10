@@ -335,6 +335,26 @@ export interface TaskCopy {
     tryAgain: string;
     noNetwork: string;
     shareRefused: string;
+    /**
+     * The invite as it arrives on a phone that already has an account: the
+     * link is read before anything is joined, so tapping it shows what it is
+     * instead of moving the app underneath somebody.
+     */
+    invitePreview: {
+      title: string;
+      loading: string;
+      headline: (by: string, space: string) => string;
+      /** When the link does not name whoever sent it. */
+      unknownInviter: string;
+      /** When the link does not name the space either. */
+      unnamedSpace: string;
+      people: (count: number) => string;
+      alreadyIn: (space: string) => string;
+      alreadyInHint: string;
+      open: string;
+    };
+    /** Said once, right after the space opens. */
+    joinedNotice: (space: string) => string;
     creatingLink: string;
     leaveProject: string;
     leaveProjectConfirm: (name: string) => string;
@@ -864,6 +884,21 @@ const ptBR: TaskCopy = {
     noNetwork: 'Sem conexão agora. Verifique a internet e tente de novo.',
     shareRefused:
       'O servidor recusou este compartilhamento agora. Tente de novo em instantes.',
+    invitePreview: {
+      title: 'Convite para um espaço',
+      loading: 'Abrindo o convite…',
+      headline: (by, space) => `${by} te convidou para ${space}`,
+      unknownInviter: 'Alguém',
+      unnamedSpace: 'um espaço compartilhado',
+      people: count =>
+        count === 1
+          ? '1 pessoa já está aqui'
+          : `${count} pessoas já estão aqui`,
+      alreadyIn: space => `Você já está em ${space}`,
+      alreadyInHint: 'Abra o espaço para ver o que anda acontecendo por lá.',
+      open: 'Abrir espaço',
+    },
+    joinedNotice: space => `Você entrou em ${space}`,
     creatingLink: 'Criando link…',
     leaveProject: 'Sair do espaço',
     leaveProjectConfirm: name =>
@@ -1404,6 +1439,21 @@ const enUS: TaskCopy = {
     noNetwork: 'No connection right now. Check the internet and try again.',
     shareRefused:
       'The server refused this share right now. Try again in a moment.',
+    invitePreview: {
+      title: 'Space invite',
+      loading: 'Opening the invite…',
+      headline: (by, space) => `${by} invited you to ${space}`,
+      unknownInviter: 'Someone',
+      unnamedSpace: 'a shared space',
+      people: count =>
+        count === 1
+          ? '1 person is already here'
+          : `${count} people are already here`,
+      alreadyIn: space => `You're already in ${space}`,
+      alreadyInHint: 'Open the space to see what has been going on there.',
+      open: 'Open space',
+    },
+    joinedNotice: space => `You're in ${space}`,
     creatingLink: 'Creating link…',
     leaveProject: 'Leave space',
     leaveProjectConfirm: name => `Leave “${name}”? You stop seeing its tasks.`,

@@ -63,6 +63,23 @@ jest.mock('../src/features/tasks/presentation/views/JoinInviteSheet', () => {
     JoinInviteSheet: () => createElement(View, { testID: 'mock-join-sheet' }),
   };
 });
+// Reading the invite is a fetch this suite has no business making: the sheet
+// it feeds is mocked here anyway.
+jest.mock(
+  '../src/features/auth/presentation/view-models/useInvitePreview',
+  () => ({
+    useInvitePreview: () => ({ preview: null, status: 'loading' }),
+  }),
+);
+jest.mock('../src/features/tasks/presentation/views/InvitePreviewSheet', () => {
+  const { View } = require('react-native');
+  const { createElement } = require('react');
+
+  return {
+    InvitePreviewSheet: () =>
+      createElement(View, { testID: 'mock-invite-preview' }),
+  };
+});
 jest.mock('../src/features/tasks/presentation/views/QuickCaptureSheet', () => ({
   QuickCaptureSheet: () => null,
 }));
@@ -108,6 +125,7 @@ function render(
     shareErrorKind: null,
     joinStatus: 'idle',
     joinErrorKind: null,
+    dismissJoinError: () => undefined,
     refreshAllSharedLists: () => Promise.resolve([]),
     refreshSharedList: () => Promise.resolve(),
     createList: () => created,
@@ -351,7 +369,7 @@ describe('creating a project that is already a group', () => {
 });
 
 describe('arriving with a tapped invite link', () => {
-  it('joins on arrival, without a field or a second confirmation', async () => {
+  it('shows the invite instead of joining behind the person', async () => {
     const joined: string[] = [];
     const handled: string[] = [];
 
@@ -373,44 +391,27 @@ describe('arriving with a tapped invite link', () => {
       await Promise.resolve();
     });
 
-    expect(joined).toEqual(['7k2xazjm']);
-    // The token is never put in front of anybody to re-approve.
+    // Nothing is joined until the preview is answered.
+    expect(joined).toEqual([]);
+    expect(has(root, 'mock-invite-preview')).toBe(true);
+    // The paste-a-link sheet stays where it belongs: behind its own button.
     expect(has(root, 'mock-join-sheet')).toBe(false);
-    // And it is spent, so a re-render cannot join twice.
+    // The token is spent on arrival, so a re-render cannot replay it.
     expect(handled).toEqual(['done']);
   });
 
-  it('opens the sheet when the link cannot be joined', async () => {
-    const root = render(
-      {
-        isRestored: true,
-        joinSharedList: () => Promise.resolve(false),
-      } as unknown as Partial<TasksViewModel>,
-      { incomingInviteToken: '7k2xazjm' },
-    );
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    // A dead or refused link needs somewhere to say so and to be retried from.
-    expect(has(root, 'mock-join-sheet')).toBe(true);
-  });
-
   it('waits for the workspace before spending the token', () => {
-    const joined: string[] = [];
+    const handled: string[] = [];
 
-    render(
+    const root = render(
+      { isRestored: false } as unknown as Partial<TasksViewModel>,
       {
-        isRestored: false,
-        joinSharedList: (input: string) => {
-          joined.push(input);
-          return Promise.resolve(true);
-        },
-      } as unknown as Partial<TasksViewModel>,
-      { incomingInviteToken: '7k2xazjm' },
+        incomingInviteToken: '7k2xazjm',
+        onIncomingInviteHandled: () => handled.push('done'),
+      },
     );
 
-    expect(joined).toEqual([]);
+    expect(handled).toEqual([]);
+    expect(has(root, 'mock-invite-preview')).toBe(false);
   });
 });
