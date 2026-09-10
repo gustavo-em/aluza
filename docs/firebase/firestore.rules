@@ -225,20 +225,29 @@ service cloud.firestore {
       // Quem ficou com cada tarefa, num mapa de topo `assignments` indexado
       // pelo uid: uid -> lista de ids de tarefa. É a única forma que a regra
       // consegue policiar — dentro de `tasks` (array de mapas) ela não sabe
-      // responder "esta pessoa só mexeu em si mesma?", e todo editor pode
+      // responder "quais chaves esta escrita tocou?", e todo editor pode
       // escrever `tasks`. Mesmo padrão do documento do dia (`members.<uid>`).
       //
-      // Dono: livre, qualquer chave. Qualquer outro membro: só a própria.
+      // Quem pode editar o conteúdo do projeto move qualquer pessoa que esteja
+      // nele: pôr alguém numa tarefa é organização, não administração. Viewer
+      // não move ninguém (nem a si mesmo) e quem não é membro não chega aqui.
+      //
+      // Mudou em 2026-09-10: antes só o dono mexia em chave alheia e o membro
+      // mexia apenas na própria (`isSelfAssignmentUpdate`), então quem não
+      // criou o espaço só via o botão "Entrar na tarefa" e não conseguia
+      // passar uma tarefa para a pessoa do lado. Espaço compartilhado é gente
+      // que já confia uma na outra; o atrito não se pagava.
       function isOwnerAssignmentUpdate() {
         return isOwner() && onlyChanges(['assignments']);
       }
 
-      function isSelfAssignmentUpdate() {
+      function isEditorAssignmentUpdate() {
         return isMember() &&
+          canEditContent() &&
           onlyChanges(['assignments']) &&
           request.resource.data.assignments.diff(
             resource.data.get('assignments', {})
-          ).affectedKeys().hasOnly([request.auth.uid]);
+          ).affectedKeys().hasOnly(resource.data.memberIds);
       }
 
       // Ler exige apenas uma sessão, não ser membro. Quem entra por convite
@@ -265,7 +274,7 @@ service cloud.firestore {
         request.resource.data.invitedAs in ['editor', 'viewer'];
       allow update: if isContentUpdate() || isMembershipUpdate() ||
         isJoining() || isLeaving() || isMemberIdentityUpdate() ||
-        isOwnerAssignmentUpdate() || isSelfAssignmentUpdate();
+        isOwnerAssignmentUpdate() || isEditorAssignmentUpdate();
       allow delete: if isOwner();
 
       // Fase 2 — "Hoje, no combinado".

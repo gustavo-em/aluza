@@ -247,6 +247,45 @@ com `@<token4>` para não colidir com o que já existe no aparelho, e **não**
 sufixa `groupId`. Funciona porque `sanitizeGroups` preserva o id do grupo como
 veio do servidor; quem mexer em um dos dois tem que olhar o outro.
 
+## Decisão de 2026-09-10 — quem põe alguém numa tarefa
+
+**Qualquer membro que possa editar o espaço (`owner` ou `editor`) põe e tira
+qualquer pessoa do espaço de qualquer tarefa.** `viewer` não atribui ninguém,
+nem a si mesmo, e para ele a seção "Pessoas" simplesmente não existe na folha
+de edição — nada desabilitado na tela.
+
+O modelo anterior era "o dono move qualquer um, todo mundo move só o próprio
+uid": `canToggleAssignment` só devolvia verdadeiro para o dono ou para quem
+mexia em si mesmo, a regra tinha `isOwnerAssignmentUpdate` e
+`isSelfAssignmentUpdate`, e a folha mostrava a lista de pessoas ao dono e um
+único botão "Entrar na tarefa" a todo o resto.
+
+Motivo da mudança, nas palavras do dono: quem não criou o espaço não conseguia
+associar outra pessoa a uma tarefa, só entrar nela. Espaço compartilhado aqui
+é gente que já confia uma na outra — pedir que a atribuição passe por quem
+criou o grupo é atrito que não se paga.
+
+O que isso significa em cada camada:
+
+- **Domínio** (`domain/TaskAssignment.ts`): `canToggleAssignment` recebe o
+  papel de quem age, o alvo e os membros do espaço; `owner`/`editor` movem
+  qualquer membro, `viewer` e quem não tem papel não movem ninguém. É mais
+  estrito que a regra de propósito — o alvo precisa ser membro.
+- **Regra** (`docs/firebase/firestore.rules`): `isSelfAssignmentUpdate` deu
+  lugar a `isEditorAssignmentUpdate` — membro em `editorIds` escrevendo
+  `assignments`, e toda chave tocada tem que estar em `memberIds`.
+  `isOwnerAssignmentUpdate` continua. A regra é a autoridade; o domínio só
+  espelha.
+- **Tela** (`TaskAssignSection.tsx`): um só layout para todo mundo que pode
+  editar — o atalho "Entrar na tarefa" no topo e, abaixo, a lista de pessoas
+  com alternância por pessoa (`task-assign-<personId>`). Não há mais ramo por
+  papel.
+- **Espaço só seu**: segue sem seção de pessoas; `assignment` é `undefined`
+  fora de projeto compartilhado.
+
+Um editor pode colocar um `viewer` numa tarefa: ele é do espaço. O que o
+`viewer` não faz é alterar o mapa.
+
 ## Decisões abertas
 
 1. **Link aberto ou convite por pessoa?** Link é 10 segundos de atrito e casa

@@ -727,15 +727,15 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
       const task = current.current.tasks.find(entry => entry.id === taskId);
       if (list?.share == null || task == null || identity == null) return;
 
-      const isOwner =
+      const actorRole =
         list.share.members.find(member => member.personId === identity.personId)
-          ?.role === 'owner';
+          ?.role ?? null;
       // Mirrors the security rule; the rule is what actually refuses it.
       if (
         !canToggleAssignment({
-          isOwner,
-          actorId: identity.personId,
+          actorRole,
           targetId,
+          memberIds: list.share.members.map(member => member.personId),
         })
       ) {
         return;

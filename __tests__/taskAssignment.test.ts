@@ -13,6 +13,7 @@ import {
   withAssignments,
   type AssignmentMap,
 } from '../src/features/tasks/domain/TaskAssignment';
+import type { ListRole } from '../src/features/tasks/domain/TaskList';
 
 function task(id: string): Task {
   return {
@@ -28,19 +29,22 @@ function task(id: string): Task {
   };
 }
 
+const MEMBER_IDS = ['dono', 'ana', 'bru'] as const;
+
 /**
  * The write the security rule sees, in the same shape: a diff of the
- * `assignments` map. `isSelfAssignmentUpdate` allows it only when the keys it
- * touches are exactly the caller's own uid; `isOwnerAssignmentUpdate` allows
- * any key. This mirrors the rule so the model and the rule cannot drift apart
- * without a red test.
+ * `assignments` map. `isEditorAssignmentUpdate` allows it when the caller may
+ * edit the project and every key it touches belongs to somebody of the
+ * project; `isOwnerAssignmentUpdate` allows any key. This mirrors the rule so
+ * the model and the rule cannot drift apart without a red test.
  */
 function ruleAllows(input: {
   before: AssignmentMap;
   after: AssignmentMap;
-  callerId: string;
-  isOwner: boolean;
+  callerRole: ListRole | null;
+  memberIds?: readonly string[];
 }): boolean {
+  const memberIds = input.memberIds ?? MEMBER_IDS;
   const keys = new Set([
     ...Object.keys(input.before),
     ...Object.keys(input.after),
@@ -51,8 +55,9 @@ function ruleAllows(input: {
       JSON.stringify(input.after[key] ?? []),
   );
 
-  if (input.isOwner) return true;
-  return changed.every(key => key === input.callerId);
+  if (input.callerRole === 'owner') return true;
+  if (input.callerRole !== 'editor') return false;
+  return changed.every(key => memberIds.includes(key));
 }
 
 describe('task assignment', () => {
@@ -101,49 +106,93 @@ describe('task assignment', () => {
     expect(withAssignee(stored, 'ana')).toBe(stored);
   });
 
-  it('lets the owner move anybody and everybody else only themselves', () => {
+  // The whole matrix in one place: each role acting on itself and on somebody
+  // else. Assignment is content, so owner and editor move anybody of the
+  // project; a viewer moves nobody, not even their own uid.
+  it.each`
+    role        | actorId   | targetId  | allowed  | what
+    ${'owner'}  | ${'dono'} | ${'dono'} | ${true}  | ${'owner on themselves'}
+    ${'owner'}  | ${'dono'} | ${'ana'}  | ${true}  | ${'owner on somebody else'}
+    ${'editor'} | ${'ana'}  | ${'ana'}  | ${true}  | ${'editor on themselves'}
+    ${'editor'} | ${'ana'}  | ${'bru'}  | ${true}  | ${'editor on somebody else'}
+    ${'viewer'} | ${'bru'}  | ${'bru'}  | ${false} | ${'viewer on themselves'}
+    ${'viewer'} | ${'bru'}  | ${'ana'}  | ${false} | ${'viewer on somebody else'}
+    ${null}     | ${'zed'}  | ${'ana'}  | ${false} | ${'a stranger to the project'}
+  `('$what: $allowed', ({ role, targetId, allowed }) => {
     expect(
-      canToggleAssignment({ isOwner: true, actorId: 'dono', targetId: 'ana' }),
-    ).toBe(true);
+      canToggleAssignment({
+        actorRole: role as ListRole | null,
+        targetId: targetId as string,
+        memberIds: MEMBER_IDS,
+      }),
+    ).toBe(allowed);
+  });
+
+  it('refuses a target who is not in the project, whoever asks', () => {
     expect(
-      canToggleAssignment({ isOwner: false, actorId: 'ana', targetId: 'ana' }),
-    ).toBe(true);
-    expect(
-      canToggleAssignment({ isOwner: false, actorId: 'ana', targetId: 'bru' }),
+      canToggleAssignment({
+        actorRole: 'editor',
+        targetId: 'zed',
+        memberIds: MEMBER_IDS,
+      }),
     ).toBe(false);
   });
 
-  it('refuses a non-owner write that touches somebody else, and allows the owner', () => {
+  it('lets an editor write another member key, and refuses the viewer and the stranger', () => {
     const before: AssignmentMap = { ana: ['t1'], bru: ['t2'] };
 
-    // Ana taking herself out of t1: her own key, allowed.
+    // Ana, an editor, taking herself out of t1: allowed.
     expect(
       ruleAllows({
         before,
         after: toggleAssignment(before, 'ana', 't1'),
-        callerId: 'ana',
-        isOwner: false,
+        callerRole: 'editor',
       }),
     ).toBe(true);
 
-    // Ana trying to take Bru out of t2: another key, refused.
+    // Ana taking Bru out of t2: another member's key, now allowed.
     expect(
       ruleAllows({
         before,
         after: toggleAssignment(before, 'bru', 't2'),
-        callerId: 'ana',
-        isOwner: false,
+        callerRole: 'editor',
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     // The owner doing exactly the same write: allowed.
     expect(
       ruleAllows({
         before,
         after: toggleAssignment(before, 'bru', 't2'),
-        callerId: 'dono',
-        isOwner: true,
+        callerRole: 'owner',
       }),
     ).toBe(true);
+
+    // A viewer moving their own uid: refused, the rule has no clause for it.
+    expect(
+      ruleAllows({
+        before,
+        after: toggleAssignment(before, 'bru', 't3'),
+        callerRole: 'viewer',
+      }),
+    ).toBe(false);
+
+    // Somebody who is not in the project at all: refused.
+    expect(
+      ruleAllows({
+        before,
+        after: toggleAssignment(before, 'ana', 't1'),
+        callerRole: null,
+      }),
+    ).toBe(false);
+
+    // An editor touching a key of somebody who is not a member: refused.
+    expect(
+      ruleAllows({
+        before,
+        after: toggleAssignment(before, 'zed', 't1'),
+        callerRole: 'editor',
+      }),
+    ).toBe(false);
   });
 });

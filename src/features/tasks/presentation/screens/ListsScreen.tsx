@@ -649,14 +649,22 @@ export function ListsScreen({
     (taskId: string) => viewModel.toggle(taskId),
     [viewModel],
   );
-  // Who took the task being edited, when that task lives in a shared project.
-  // Anywhere else the sheet gets nothing and stays the sheet it always was.
+  // Who took the task being edited, when that task lives in a shared project
+  // and this account may edit it. Anywhere else — a project of your own, or a
+  // project you only read — the sheet gets nothing and stays the sheet it
+  // always was: a viewer sees no toggle at all, not even a disabled one.
   const editingList =
     editingTask == null ? null : viewModel.listOf(editingTask.listId);
   const editingShare = editingList?.share ?? null;
   const identityId = viewModel.identity?.personId ?? null;
   const editingAssignment = useMemo(() => {
-    if (editingTask == null || editingShare == null || identityId == null) {
+    if (
+      editingTask == null ||
+      editingList == null ||
+      editingShare == null ||
+      identityId == null ||
+      !canEdit(editingList, identityId)
+    ) {
       return undefined;
     }
 
@@ -664,9 +672,6 @@ export function ListsScreen({
       members: editingShare.members,
       assignedIds: editingTask.assignedIds ?? EMPTY_ASSIGNED_IDS,
       personId: identityId,
-      isOwner:
-        editingShare.members.find(member => member.personId === identityId)
-          ?.role === 'owner',
       onToggle: (targetId: string) =>
         viewModel.toggleTaskAssignee(
           editingTask.listId,
@@ -674,7 +679,7 @@ export function ListsScreen({
           targetId,
         ),
     };
-  }, [editingShare, editingTask, identityId, viewModel]);
+  }, [editingList, editingShare, editingTask, identityId, viewModel]);
   // The space on screen, or none: the index and the open space are two views
   // of the same tab, never both at once.
   const openList =

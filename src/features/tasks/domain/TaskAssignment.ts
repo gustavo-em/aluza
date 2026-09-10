@@ -1,4 +1,5 @@
 import { sanitizeAssignedIds, type Task } from './Task';
+import type { ListRole } from './TaskList';
 
 /**
  * Who took what inside a shared project, indexed by person.
@@ -66,14 +67,27 @@ export function toggleAssignment(
 /**
  * The permission model, in one place.
  *
- * The owner may take anybody in or out of any task; everybody else may only
- * move their own uid. This mirrors the security rule and never replaces it:
- * the rule is what actually refuses the write.
+ * Assignment is content, not administration: whoever may edit the project —
+ * `owner` or `editor` — puts anybody of the project in or out of any task,
+ * themselves included. A `viewer` moves nobody, not even their own uid, and
+ * somebody with no role at all is not in the project.
+ *
+ * Changed on 2026-09-10: it used to be "the owner moves anybody, everybody
+ * else only themselves", which left a member staring at a single "join this
+ * task" button with no way to hand a task to the person next to them. A
+ * shared space is people who already trust each other; the friction did not
+ * pay for itself.
+ *
+ * This mirrors the security rule and never replaces it: the rule is what
+ * actually refuses the write. It is stricter than the rule on purpose — the
+ * target has to be a member here, while the rule leaves the owner free.
  */
 export function canToggleAssignment(input: {
-  isOwner: boolean;
-  actorId: string;
+  actorRole: ListRole | null;
   targetId: string;
+  memberIds: readonly string[];
 }): boolean {
-  return input.isOwner || input.actorId === input.targetId;
+  if (input.actorRole !== 'owner' && input.actorRole !== 'editor') return false;
+
+  return input.memberIds.includes(input.targetId);
 }

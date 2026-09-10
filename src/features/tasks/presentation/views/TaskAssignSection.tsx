@@ -16,16 +16,16 @@ export interface TaskAssignment {
   assignedIds: readonly string[];
   /** The signed-in account. */
   personId: string;
-  isOwner: boolean;
   onToggle: (personId: string) => void;
 }
 
 /**
  * Who took this task.
  *
- * The owner sees the project's members and turns each one on or off; anybody
- * else sees one button and it only ever moves themselves — a control over
- * somebody else is never drawn for them, not even disabled.
+ * Everybody who may edit the project sees the same thing: the shortcut for
+ * themselves on top, and below it the project's members, each one a toggle.
+ * A `viewer` never gets here at all — the screen leaves `assignment` out
+ * instead of drawing controls that would only refuse the tap.
  */
 export function TaskAssignSection({
   assignment,
@@ -35,7 +35,7 @@ export function TaskAssignSection({
   copy: TaskCopy;
 }) {
   const theme = useTheme();
-  const { members, assignedIds, personId, isOwner, onToggle } = assignment;
+  const { members, assignedIds, personId, onToggle } = assignment;
 
   const nameOf = (member: ListMember) =>
     member.personId === personId
@@ -70,82 +70,80 @@ export function TaskAssignSection({
         <SectionRule />
       </SectionHeader>
 
-      {isOwner ? (
-        members.map((member, index) => {
-          const checked = assignedIds.includes(member.personId);
-          const name = nameOf(member);
+      {/* The shortcut for yourself, on top: the one move somebody makes over
+        and over does not deserve a hunt down the list. */}
+      <SelfButton
+        $joined={iAmIn}
+        accessibilityLabel={iAmIn ? copy.lists.leaveTask : copy.lists.joinTask}
+        accessibilityRole="button"
+        accessibilityState={{ selected: iAmIn }}
+        onPress={() =>
+          toggle(
+            me ?? {
+              personId,
+              name: copy.lists.memberYou,
+              handle: null,
+              role: 'editor',
+              joined: true,
+            },
+          )
+        }
+        testID="task-assign-self"
+      >
+        <SelfButtonText $joined={iAmIn}>
+          {iAmIn ? copy.lists.leaveTask : copy.lists.joinTask}
+        </SelfButtonText>
+      </SelfButton>
 
-          return (
-            <MemberRow
-              $last={index === members.length - 1}
-              accessibilityLabel={
-                checked
-                  ? copy.lists.unassignPerson(name)
-                  : copy.lists.assignPerson(name)
+      {members.map((member, index) => {
+        const checked = assignedIds.includes(member.personId);
+        const name = nameOf(member);
+
+        return (
+          <MemberRow
+            $last={index === members.length - 1}
+            accessibilityLabel={
+              checked
+                ? copy.lists.unassignPerson(name)
+                : copy.lists.assignPerson(name)
+            }
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked }}
+            key={member.personId}
+            onPress={() => toggle(member)}
+            scaleTo={0.99}
+            testID={`task-assign-${member.personId}`}
+          >
+            <MemberChip
+              initials={
+                member.personId === personId
+                  ? copy.lists.memberYouInitials
+                  : undefined
               }
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked }}
-              key={member.personId}
-              onPress={() => toggle(member)}
-              scaleTo={0.99}
-              testID={`task-assign-${member.personId}`}
-            >
-              <MemberChip
-                initials={
-                  member.personId === personId
-                    ? copy.lists.memberYouInitials
-                    : undefined
-                }
-                name={name}
-                personId={member.personId}
-                photoURL={member.photoURL ?? null}
-                pending={!member.joined}
-                size="large"
-              />
-              <MemberInfo>
-                <MemberName numberOfLines={1} ellipsizeMode="tail">
-                  {name}
-                </MemberName>
-                {member.handle == null ? null : (
-                  <MemberSub numberOfLines={1} ellipsizeMode="tail">
-                    {`@${member.handle}`}
-                  </MemberSub>
-                )}
-              </MemberInfo>
-              <CheckSlot $checked={checked}>
-                {checked ? (
-                  <CheckGlyph color={theme.colors.onAccent} size={12} />
-                ) : null}
-              </CheckSlot>
-            </MemberRow>
-          );
-        })
-      ) : (
-        <SelfButton
-          $joined={iAmIn}
-          accessibilityLabel={
-            iAmIn ? copy.lists.leaveTask : copy.lists.joinTask
-          }
-          accessibilityRole="button"
-          accessibilityState={{ selected: iAmIn }}
-          onPress={() =>
-            toggle(
-              me ?? {
-                personId,
-                name: copy.lists.memberYou,
-                handle: null,
-                role: 'editor',
-                joined: true,
-              },
-            )
-          }
-          testID="task-assign-self"
-        >
-          <SelfButtonText $joined={iAmIn}>
-            {iAmIn ? copy.lists.leaveTask : copy.lists.joinTask}
-          </SelfButtonText>
-        </SelfButton>
-      )}
+              name={name}
+              personId={member.personId}
+              photoURL={member.photoURL ?? null}
+              pending={!member.joined}
+              size="large"
+            />
+            <MemberInfo>
+              <MemberName numberOfLines={1} ellipsizeMode="tail">
+                {name}
+              </MemberName>
+              {member.handle == null ? null : (
+                <MemberSub numberOfLines={1} ellipsizeMode="tail">
+                  {`@${member.handle}`}
+                </MemberSub>
+              )}
+            </MemberInfo>
+            <CheckSlot $checked={checked}>
+              {checked ? (
+                <CheckGlyph color={theme.colors.onAccent} size={12} />
+              ) : null}
+            </CheckSlot>
+          </MemberRow>
+        );
+      })}
     </Section>
   );
 }
@@ -223,6 +221,7 @@ const SelfButton = styled(PressableScale)<{ $joined: boolean }>`
   align-items: center;
   justify-content: center;
   margin-top: ${({ theme }) => theme.spacing.small}px;
+  margin-bottom: ${({ theme }) => theme.spacing.small}px;
   padding: 0px ${({ theme }) => theme.spacing.medium}px;
   border-radius: ${({ theme }) => theme.radii.medium}px;
   border: 1px solid
