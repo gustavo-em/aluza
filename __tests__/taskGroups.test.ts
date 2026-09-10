@@ -81,7 +81,7 @@ function taskIn(
 }
 
 describe('task groups inside a space', () => {
-  it('creates a group with a required icon and refuses a duplicate name', () => {
+  it('creates a group with the icon it was given and refuses a duplicate name', () => {
     const { workspace, group } = spaceWithGroup();
 
     expect(group).toMatchObject({

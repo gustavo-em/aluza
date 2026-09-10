@@ -70,8 +70,9 @@ interface GroupEditorSheetProps {
  * The icon is a field here, not an ornament: a group's whole job is to be
  * recognizable at a glance inside a space that already has lines in it. So the
  * sheet asks for it out loud — and then answers its own question, pre-selecting
- * a guess from what is being typed, so that a required field never becomes a
- * wall in front of somebody who only wanted to name a birthday.
+ * a guess from what is being typed, and saying so in the label, so that the
+ * grid never reads as a wall in front of somebody who only wanted to name a
+ * birthday. The name alone makes the group.
  *
  * The preview is the top of the sheet itself. A separate preview card would be
  * a second group on screen that does not exist; the square beside the name is
@@ -233,7 +234,10 @@ export function GroupEditorSheet({
               {error ? <ErrorText>{words.duplicateName}</ErrorText> : null}
 
               <FieldLabel>
-                {words.iconLabel} <Required>{words.iconRequired}</Required>
+                {words.iconLabel}
+                {editing == null && iconChoice == null ? (
+                  <LabelNote>{` ${words.iconSuggested}`}</LabelNote>
+                ) : null}
               </FieldLabel>
               <IconGrid accessibilityRole="radiogroup">
                 {icons.map(value => {
@@ -458,10 +462,13 @@ const FieldLabel = styled.Text`
   margin-top: ${({ theme }) => theme.spacing.medium + 4}px;
 `;
 
-/* Said in the label rather than enforced by a blocked button: the sheet has
-   already answered its own question with a guess. */
-const Required = styled.Text`
+/* The label says where the icon came from, not that it is owed: the sheet has
+   already answered its own question with a guess from the name, and the grid
+   below is there for whoever wants a different answer. */
+const LabelNote = styled.Text`
   color: ${({ theme }) => theme.colors.recognizedText};
+  /* Said in a normal voice: the label above it is the one in capitals. */
+  text-transform: none;
 `;
 
 const IconGrid = styled.View`

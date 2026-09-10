@@ -167,9 +167,13 @@ export interface TaskCopy {
     addToDay: string;
     inDay: string;
     newList: string;
-    /** Sits under "Novo espaço": the templates are a shortcut, never a
-     * requirement. */
-    templatesSubtitle: string;
+    /** Sits under the name field: what the name alone already does, so the
+     * grid below never reads as a gate. */
+    nameOnlyHint: string;
+    /** The section heading over the starting points, and the quiet marker
+     * beside it: the templates are a shortcut, never a requirement. */
+    templatesLabel: string;
+    optionalLabel: string;
     /** Name and short description of each starting point. The name is what
      * lands in the name field when the card is tapped. */
     templates: Record<ProjectTemplateId, { name: string; description: string }>;
@@ -383,9 +387,9 @@ export interface TaskCopy {
       namePlaceholder: string;
       duplicateName: string;
       iconLabel: string;
-      /** Said out loud next to the label: the icon is a field, not an
-       * ornament, and the primary action waits for it. */
-      iconRequired: string;
+      /** Said next to the label while the icon is still the sheet's own
+       * guess: the grid is an optional answer, never a gate. */
+      iconSuggested: string;
       colorLabel: string;
       dateLabel: string;
       noDate: string;
@@ -703,7 +707,9 @@ const ptBR: TaskCopy = {
     addToDay: 'Colocar no dia de hoje',
     inDay: 'No dia',
     newList: 'Novo espaço',
-    templatesSubtitle: 'Comece de um destes ou do zero.',
+    nameOnlyHint: 'Só o nome já cria o espaço.',
+    templatesLabel: 'Modelos',
+    optionalLabel: 'opcional',
     templates: {
       home: { name: 'Casa', description: 'Consertos e combinados' },
       trip: { name: 'Viagem', description: 'Reservas, malas, roteiro' },
@@ -924,7 +930,7 @@ const ptBR: TaskCopy = {
       namePlaceholder: 'Do que se trata?',
       duplicateName: 'Já existe um grupo com esse nome neste espaço.',
       iconLabel: 'Ícone',
-      iconRequired: '· obrigatório',
+      iconSuggested: '· sugerido pelo nome',
       colorLabel: 'Cor',
       dateLabel: 'Data do evento',
       noDate: 'Sem data',
@@ -1259,7 +1265,9 @@ const enUS: TaskCopy = {
     addToDay: 'Add to today',
     inDay: 'In the day',
     newList: 'New space',
-    templatesSubtitle: 'Start from one of these, or from scratch.',
+    nameOnlyHint: 'The name alone creates the space.',
+    templatesLabel: 'Templates',
+    optionalLabel: 'optional',
     templates: {
       home: { name: 'Home', description: 'Repairs and agreements' },
       trip: { name: 'Trip', description: 'Bookings, packing, itinerary' },
@@ -1478,7 +1486,7 @@ const enUS: TaskCopy = {
       namePlaceholder: 'What is it about?',
       duplicateName: 'A group with this name already exists in this space.',
       iconLabel: 'Icon',
-      iconRequired: '· required',
+      iconSuggested: '· suggested from the name',
       colorLabel: 'Colour',
       dateLabel: 'Event date',
       noDate: 'No date',

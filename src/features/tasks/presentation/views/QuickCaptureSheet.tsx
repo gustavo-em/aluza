@@ -43,6 +43,7 @@ import {
   CalendarGlyph,
   ChevronGlyph,
   PlayGlyph,
+  PlusGlyph,
   PriorityGlyph,
   ProjectGlyph,
   TagGlyph,
@@ -629,20 +630,21 @@ export function QuickCaptureSheet({
                       {copy.capture.kind.reminder}
                     </KindText>
                   </KindOption>
-                  {/* The third thing a space can hold. It never becomes the
-                      selected segment: tapping it hands over to the sheet that
-                      asks for an icon and a colour, which a task has no use
-                      for. */}
+                  {/* The third thing a space can hold. It is not a segment at
+                      all: it never becomes the selected one, it hands over to
+                      the sheet that names a group. So it reads as an action —
+                      a plus and, to a screen reader, "Novo grupo" — instead of
+                      a choice sitting there unchosen. */}
                   {onChooseGroup == null || isEditing ? null : (
                     <KindOption
                       $active={false}
-                      accessibilityLabel={copy.capture.kind.group}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: false }}
+                      accessibilityLabel={copy.lists.groups.newGroup}
+                      accessibilityRole="button"
                       hitSlop={{ top: 6, bottom: 6 }}
                       onPress={onChooseGroup}
                       testID="capture-kind-group"
                     >
+                      <PlusGlyph color={theme.colors.mutedStrong} size={11} />
                       <KindText $active={false}>
                         {copy.capture.kind.group}
                       </KindText>

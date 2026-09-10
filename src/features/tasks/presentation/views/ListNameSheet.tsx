@@ -114,10 +114,12 @@ export function ProjectEditorSheet({
   // chip that names it is tapped. Nothing typed is lost either way.
   const [choosing, setChoosing] = useState(templates);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  // Which starting point the sheet is resting on. It is a highlight, never a
-  // decision: nothing is created until "Criar" is pressed.
+  // Which starting point the sheet is resting on, once one has been tapped.
+  // Nothing rests on any of them to begin with: the name field above the grid
+  // is already the way in, and a card announced as selected before anybody
+  // touched it is what made the grid look like the only way.
   const [focusedTemplate, setFocusedTemplate] =
-    useState<ProjectTemplateId>('home');
+    useState<ProjectTemplateId | null>(null);
   // Kept here as well so the segmented control answers on its own when the
   // caller does not hold the role.
   const [invitedAs, setInvitedAs] = useState<InviteRole>(
@@ -125,6 +127,9 @@ export function ProjectEditorSheet({
   );
   const usable = name.trim().length > 0;
   const shared = shareOption?.value === true;
+  // The chip that reopens the grid names where the sheet came from; arriving
+  // by the blank card is what it says when nothing was tapped.
+  const restingTemplate = focusedTemplate ?? 'blank';
   const tone = projectTone(theme, color);
   // The symbol on the square is paper on ink, except on the yellow, where
   // paper would vanish: there it takes the ink the accent already carries.
@@ -158,8 +163,12 @@ export function ProjectEditorSheet({
     const appearance = templateAppearance(id);
 
     setFocusedTemplate(id);
-    // The blank card fills nothing in: whatever was typed stays.
-    if (id !== 'blank') setName(copy.lists.templates[id].name);
+    // The blank card fills nothing in, and neither does any other one over a
+    // name somebody already typed: the grid is a shortcut for an empty field,
+    // never something that overwrites their own words.
+    if (id !== 'blank' && name.trim().length === 0) {
+      setName(copy.lists.templates[id].name);
+    }
     setError(false);
     setIcon(appearance.icon);
     setColor(appearance.color);
@@ -276,7 +285,17 @@ export function ProjectEditorSheet({
 
               {choosing ? (
                 <>
-                  <Hint>{copy.lists.templatesSubtitle}</Hint>
+                  <Hint>{copy.lists.nameOnlyHint}</Hint>
+                  {/* The starting points are a section under the name, set
+                      apart by a heading and a hairline rather than by a box
+                      around the cards. */}
+                  <SectionHead>
+                    <SectionLabel>
+                      {copy.lists.templatesLabel}
+                      <SectionNote>{` · ${copy.lists.optionalLabel}`}</SectionNote>
+                    </SectionLabel>
+                    <SectionRule />
+                  </SectionHead>
                   <TemplateGrid>
                     {projectTemplateIds.map(id => {
                       const template = projectTemplates[id];
@@ -354,7 +373,7 @@ export function ProjectEditorSheet({
                       <Chip
                         $filled={false}
                         accessibilityLabel={copy.lists.changeTemplate(
-                          copy.lists.templates[focusedTemplate].name,
+                          copy.lists.templates[restingTemplate].name,
                         )}
                         accessibilityRole="button"
                         onPress={() => {
@@ -365,7 +384,7 @@ export function ProjectEditorSheet({
                       >
                         <ChipTextQuiet>
                           {copy.lists.changeTemplate(
-                            copy.lists.templates[focusedTemplate].name,
+                            copy.lists.templates[restingTemplate].name,
                           )}
                         </ChipTextQuiet>
                       </Chip>
@@ -663,6 +682,38 @@ const Hint = styled.Text`
   font-weight: 500;
   line-height: ${({ theme }) => theme.type.label + 5}px;
   margin-top: ${({ theme }) => theme.spacing.medium}px;
+`;
+
+/* A section heading in the house pattern: a short label in capitals, a quiet
+   marker where a count would go, and a hairline across the rest of the width.
+   The rule is what groups the cards below — never a box around them. */
+const SectionHead = styled.View`
+  flex-direction: row;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.small}px;
+  margin-top: ${({ theme }) => theme.spacing.medium}px;
+`;
+
+const SectionLabel = styled.Text`
+  color: ${({ theme }) => theme.colors.muted};
+  font-size: ${({ theme }) => theme.type.caption}px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+`;
+
+/* Where a count would sit: said in a normal voice, so the label beside it
+   stays the one in capitals. */
+const SectionNote = styled.Text`
+  font-weight: 600;
+  letter-spacing: 0px;
+  text-transform: none;
+`;
+
+const SectionRule = styled.View`
+  flex: 1;
+  height: 1px;
+  background-color: ${({ theme }) => theme.colors.borderSubtle};
 `;
 
 const TemplateGrid = styled.View`

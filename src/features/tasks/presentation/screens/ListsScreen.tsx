@@ -2389,11 +2389,20 @@ const AddTaskText = styled.Text`
 `;
 /* The two ways to add to a space, on one line at the end of its list. The
    second is quieter than the first: a group is the rarer of the two, and the
-   row must not read as two primary actions. */
+   row must not read as two primary actions.
+
+   The line wraps rather than overflows. In a space with no loose task the
+   first label is the long one ("Adicionar primeira tarefa"), and the pair no
+   longer fits a 360dp width: without wrapping, the group button was pushed
+   off the screen entirely — exactly in the space where somebody is about to
+   make their first group. Neither label ever shrinks or truncates; the second
+   one drops to its own line and the margins it already carries space it. */
 const EndActions = styled.View`
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: ${({ theme }) => theme.spacing.medium + 2}px;
+  column-gap: ${({ theme }) => theme.spacing.medium + 2}px;
+  row-gap: 0px;
 `;
 const AddGroupButton = styled(PressableScale)`
   flex-direction: row;

@@ -4,13 +4,15 @@ import {
   type ProjectIcon,
 } from '../../domain/TaskList';
 
+/** The blank one comes first: making a space from nothing is the front door,
+ * not the last card in the grid. */
 export const projectTemplateIds = [
+  'blank',
   'home',
   'trip',
   'bills',
   'market',
   'work',
-  'blank',
 ] as const;
 
 export type ProjectTemplateId = (typeof projectTemplateIds)[number];
