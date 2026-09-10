@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react';
+import { ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import styled, { ThemeProvider } from 'styled-components/native';
 
@@ -61,6 +68,7 @@ import { firebaseCrashReporter } from './infrastructure/crash/firebaseCrashRepor
 import { asyncStoragePreferencesStore } from './infrastructure/preferences/asyncStoragePreferencesStore';
 import { asyncStorageReviewInvitationStore } from './infrastructure/review/asyncStorageReviewInvitationStore';
 import { systemAppReviewPrompter } from './infrastructure/review/systemAppReviewPrompter';
+import { youReselectAction } from './navigation/tabReselect';
 import { useIncomingInvite } from './session/useIncomingInvite';
 import { useReviewInvitation } from './session/useReviewInvitation';
 import { useLocalWorkspace } from './session/useLocalWorkspace';
@@ -345,6 +353,36 @@ function AppContent({
     return () => clearTimeout(timeout);
   }, [behindProfile]);
 
+  const youScrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  // Tapping the tab that is already open steps back one level. Here that is
+  // the profile screen; with nothing pushed over the tab, the column goes back
+  // to the top. Anything covering the app — a block, the celebration, the
+  // rating card, the account dialog — is what the tap would be answering, so
+  // it is left alone.
+  const tabReselectCount = app.tabReselectCount;
+  const lastTabReselect = useRef(tabReselectCount);
+  const isShellOverlayOpen =
+    isFocusOpen ||
+    deleteAccount.isOpen ||
+    tasks.celebratingStreak != null ||
+    review.isInviting;
+
+  useEffect(() => {
+    if (tabReselectCount === lastTabReselect.current) return;
+
+    lastTabReselect.current = tabReselectCount;
+    if (app.activeTab !== 'you') return;
+
+    const action = youReselectAction({
+      blocked: isShellOverlayOpen,
+      route: youRoute,
+    });
+
+    if (action === 'closeProfile') setYouRoute('root');
+    if (action === 'scrollTop')
+      youScrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [app.activeTab, isShellOverlayOpen, tabReselectCount, youRoute]);
+
   return (
     <>
       {/* `accessibilityViewIsModal` is iOS only, and the Android flags on a
@@ -367,6 +405,7 @@ function AppContent({
               focus={focusRow}
               language={app.language}
               onChooseFocusDuration={chooseFocusDurationFor}
+              tabReselect={tabReselectCount}
               viewModel={tasks}
             />
           ) : null}
@@ -389,6 +428,7 @@ function AppContent({
                 onDismiss: app.markActivityPermissionAsked,
               }}
               ownProfile={profile.profile}
+              tabReselect={tabReselectCount}
               viewModel={tasks}
             />
           ) : null}
@@ -396,6 +436,7 @@ function AppContent({
           {app.activeTab === 'you' ? (
             <YouTab
               contentContainerStyle={styles.youTab}
+              ref={youScrollRef}
               showsVerticalScrollIndicator={false}
             >
               {/* Who this account is comes first: the numbers and the settings

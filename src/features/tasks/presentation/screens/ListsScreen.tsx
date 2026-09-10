@@ -1,5 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, RefreshControl, StyleSheet } from 'react-native';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react';
+import { AppState, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import styled, { useTheme } from 'styled-components/native';
 
@@ -12,6 +20,7 @@ import {
   screenEnter,
   SHEET_EXIT,
 } from '../../../../app/animation/motion';
+import { spacesReselectAction } from '../../../../app/navigation/tabReselect';
 import { markSheetPress, useRenderCount } from '../../../../app/perf/sheetPerf';
 import { sortedReminders } from '../../domain/Reminder';
 import {
@@ -109,6 +118,10 @@ interface ListsScreenProps {
     onEnable: () => Promise<boolean>;
     onDismiss: () => void;
   };
+  /** How many times the tab already open has been tapped again. Each new value
+   * steps one level back out — a group to its space, a space to the index —
+   * and, with nothing open, takes the index back to the top. */
+  tabReselect?: number;
   viewModel: TasksViewModel;
 }
 
@@ -155,10 +168,12 @@ export function ListsScreen({
   language,
   notificationPrompt,
   ownProfile,
+  tabReselect = 0,
   viewModel,
 }: ListsScreenProps) {
   const theme = useTheme();
   useRenderCount('ListsScreen');
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
@@ -394,6 +409,54 @@ export function ListsScreen({
     setOpenGroupId(null);
     setGroupActionsOpen(false);
   }, []);
+
+  // A sheet in front of the screen is what a tap would be answering, so the
+  // tab is left to do nothing while one is open: nothing here ever closes one.
+  const hasSheetOpen =
+    creatingList ||
+    joiningInvite ||
+    renamingList != null ||
+    deletingList != null ||
+    capturingForList != null ||
+    capturingForGroup != null ||
+    creatingGroupFor != null ||
+    editingGroup != null ||
+    deletingGroup != null ||
+    sharingList != null ||
+    pendingShare != null ||
+    leavingList != null ||
+    editing != null ||
+    deleting != null;
+
+  // Tapping the spaces tab while it is already open walks back out, one level
+  // per tap, through the very calls the arrow at the top makes. The counter is
+  // read against what it was when this screen mounted, so arriving on the tab
+  // is never mistaken for a tap on it.
+  const lastReselect = useRef(tabReselect);
+
+  useEffect(() => {
+    if (tabReselect === lastReselect.current) return;
+
+    lastReselect.current = tabReselect;
+
+    const action = spacesReselectAction({
+      blocked: hasSheetOpen,
+      openListId,
+      openGroupId,
+    });
+
+    if (action === 'closeGroup') leaveGroup();
+    if (action === 'closeSpace' && openListId != null) toggleOpen(openListId);
+    if (action === 'scrollTop')
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [
+    hasSheetOpen,
+    leaveGroup,
+    openGroupId,
+    openListId,
+    tabReselect,
+    toggleOpen,
+  ]);
   const startGroup = useCallback((list: TaskList) => {
     setCapturingForList(null);
     setCreatingGroupFor(list);
@@ -612,6 +675,7 @@ export function ListsScreen({
         contentContainerStyle={
           openList != null ? styles.scroll : styles.scrollIndex
         }
+        ref={scrollRef}
         refreshControl={
           <RefreshControl
             onRefresh={handlePullRefresh}

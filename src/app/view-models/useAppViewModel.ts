@@ -30,6 +30,15 @@ export function useAppViewModel(
   bus: TaskEventBus,
 ) {
   const [activeTab, setActiveTab] = useState<AppTab>('today');
+  // A tap on the tab already open is an event, not a no-op: React drops a
+  // `setState` to the same value, so the screen would never hear about it. The
+  // counter is what the active screen watches to step back one level.
+  const [tabReselectCount, setTabReselectCount] = useState(0);
+  // The tab as the handler sees it, so `selectTab` can tell a re-tap from a
+  // move without taking `activeTab` as a dependency: the shell's effects hold
+  // on to this callback, and a new identity on every tab change would replay
+  // them.
+  const activeTabRef = useRef<AppTab>('today');
   const [preferences, setPreferences] = useState<AppPreferences>(
     DEFAULT_APP_PREFERENCES,
   );
@@ -112,7 +121,17 @@ export function useAppViewModel(
 
   return {
     activeTab,
-    selectTab: useCallback((tab: AppTab) => setActiveTab(tab), []),
+    /** Bumped every time the tab already open is tapped again. */
+    tabReselectCount,
+    selectTab: useCallback((tab: AppTab) => {
+      if (activeTabRef.current === tab) {
+        setTabReselectCount(count => count + 1);
+        return;
+      }
+
+      activeTabRef.current = tab;
+      setActiveTab(tab);
+    }, []),
     appearanceMode: preferences.appearanceMode,
     /** The language every screen speaks, with "system" already resolved. */
     language,

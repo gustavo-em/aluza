@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import styled, { useTheme } from 'styled-components/native';
 
+import { flatReselectAction } from '../../../../app/navigation/tabReselect';
 import { markSheetPress, useRenderCount } from '../../../../app/perf/sheetPerf';
 import { type Task } from '../../domain/Task';
 import { findGroupById, type TaskGroup } from '../../domain/TaskGroup';
@@ -73,6 +74,9 @@ interface TodayScreenProps {
     phase: 'running' | 'paused' | 'finished';
     onOpen: () => void;
   } | null;
+  /** How many times the tab already open has been tapped again. This screen
+   * has no level to leave, so each new value takes the list back to the top. */
+  tabReselect?: number;
 }
 
 /**
@@ -85,6 +89,7 @@ export function TodayScreen({
   viewModel,
   onChooseFocusDuration,
   focus = null,
+  tabReselect = 0,
 }: TodayScreenProps) {
   const theme = useTheme();
   useRenderCount('TodayScreen');
@@ -97,6 +102,23 @@ export function TodayScreen({
   // The lens decides what the whole screen means, so hiding it behind a
   // toggle hid the answer to "why is it ordered like this".
   const [filtersOpen, setFiltersOpen] = useState(true);
+
+  // Tapping the tab already open: there is nothing to leave here, so the list
+  // goes back to the top. A sheet in front of it is what the tap would be
+  // answering, so it is left alone. The counter is read against what it was on
+  // mount, so arriving on the tab is never mistaken for a tap on it.
+  const hasSheetOpen = isCapturing || editing != null || deleting != null;
+  const lastReselect = useRef(tabReselect);
+
+  useEffect(() => {
+    if (tabReselect === lastReselect.current) return;
+
+    lastReselect.current = tabReselect;
+    if (flatReselectAction({ blocked: hasSheetOpen }) === 'ignore') return;
+
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [hasSheetOpen, tabReselect]);
+
   const sectionsForGrouping = useCallback(
     (nextGrouping: HomeGrouping) =>
       homeSections(
