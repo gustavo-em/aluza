@@ -6,16 +6,17 @@ abre o navegador numa página em branco não é um convite, é um beco.
 
 ## O que já está no repositório
 
-| Peça                     | Onde                                            | Estado                                         |
-| ------------------------ | ----------------------------------------------- | ---------------------------------------------- |
-| Página e JSON do convite | `functions/invite.js`                           | pronta, falta o deploy                         |
-| Rewrite `/e/**` → função | `firebase.json`                                 | pronto                                         |
-| Associação iOS           | `public/.well-known/apple-app-site-association` | pronta                                         |
-| Associação Android       | `public/.well-known/assetlinks.json`            | pronta (release + debug)                       |
-| Link gerado pelo app     | `src/features/tasks/domain/TaskList.ts`         | `https://ideiasorganizetask.web.app/e/<token>` |
-| Abrir o app pelo link    | `src/app/session/useIncomingInvite.ts`          | pronto                                         |
-| Filtro de intent Android | `android/app/src/main/AndroidManifest.xml`      | pronto                                         |
-| Capability iOS           | `ios/…/IdeiasOrganizeTask.entitlements`         | pronta                                         |
+| Peça                         | Onde                                            | Estado                                         |
+| ---------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| Página e JSON do convite     | `functions/invite.js`                           | no ar em `/e/<token>`                          |
+| Lojas (id da Apple, package) | `functions/stores.js`                           | App Store preenchida; Play vazia               |
+| Rewrite `/e/**` → função     | `firebase.json`                                 | pronto                                         |
+| Associação iOS               | `public/.well-known/apple-app-site-association` | pronta                                         |
+| Associação Android           | `public/.well-known/assetlinks.json`            | pronta (release + debug)                       |
+| Link gerado pelo app         | `src/features/tasks/domain/TaskList.ts`         | `https://ideiasorganizetask.web.app/e/<token>` |
+| Abrir o app pelo link        | `src/app/session/useIncomingInvite.ts`          | pronto                                         |
+| Filtro de intent Android     | `android/app/src/main/AndroidManifest.xml`      | pronto                                         |
+| Capability iOS               | `ios/…/IdeiasOrganizeTask.entitlements`         | pronta                                         |
 
 ## Publicar
 
@@ -34,6 +35,30 @@ curl -sI https://ideiasorganizetask.web.app/.well-known/apple-app-site-associati
 ```
 
 ## O que falta
+
+### Ligar o botão da Play
+
+Enquanto `ANDROID_PACKAGE` estiver vazio, a página de convite não mostra botão
+da Play: quem chega de Android vê que ela chega em breve e que o código do
+convite continua valendo. No dia em que a ficha estiver no ar, uma linha em
+`functions/stores.js`:
+
+```js
+const ANDROID_PACKAGE = 'com.ideiasorganizetask';
+```
+
+e a linha equivalente no site, `LOJAS.android` em `docs/index.html` e
+`public/index.html` (os dois arquivos são cópias e mudam juntos):
+
+```js
+android: 'https://play.google.com/store/apps/details?id=com.ideiasorganizetask',
+```
+
+Depois:
+
+```bash
+firebase deploy --only functions,hosting
+```
 
 ### Play App Signing
 

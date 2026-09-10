@@ -959,7 +959,7 @@
                 >
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
-                <span>Caixa pessoal para o que não é de ninguém mais</span>
+                <span>Avulsas: um lugar para o que não é de ninguém mais</span>
               </li>
               <li>
                 <svg
@@ -1203,10 +1203,13 @@
     </footer>
 
     <script>
-      /* Quando as fichas das lojas existirem, preencha as duas URLs abaixo:
-     os botões deixam de dizer "Em breve" e passam a levar para a loja. */
+      /* Uma URL por loja: preenchida, o botão deixa de dizer "Em breve" e
+     passa a levar para a loja. A da Apple veio do lookup por bundle
+     (com.aluza.app → trackId 6808513680), conferido em 2026-09-10. O Android
+     entra no dia em que a ficha da Play ficar no ar, e a mesma linha existe
+     em ANDROID_PACKAGE, em functions/stores.js. */
       var LOJAS = {
-        ios: '' /* ex.: 'https://apps.apple.com/br/app/aluza/id0000000000' */,
+        ios: 'https://apps.apple.com/app/id6808513680',
         android:
           '' /* ex.: 'https://play.google.com/store/apps/details?id=com.ideiasorganizetask' */,
       };
