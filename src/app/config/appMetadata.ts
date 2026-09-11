@@ -5,7 +5,7 @@
  * through `android/app/build.gradle`, iOS through the Xcode project — and
  * nothing checks the two against each other, so this one has to be moved by
  * hand in the same commit that moves that one. */
-export const APP_VERSION = '1.3';
+export const APP_VERSION = '1.4';
 
 export const APP_NAME = 'Aluza';
 export const APP_DESCRIPTOR = 'Lista de tarefas';
