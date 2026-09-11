@@ -73,7 +73,11 @@ exports.invite = onRequest({ cors: true }, async (request, response) => {
       platform: platformOf(request.get('user-agent')),
       // The banner points back at this same invite, on whichever domain the
       // person actually opened — the site answers on more than one.
-      origin: originFromHost(request.get('host')),
+      // Hosting puts the domain the reader typed in `x-forwarded-host` and its
+      // own runtime name in `host`; the first is the one worth echoing.
+      origin: originFromHost(
+        request.get('x-forwarded-host') ?? request.get('host'),
+      ),
     }),
   );
 });

@@ -56,15 +56,24 @@ function platformOf(userAgent) {
   return 'other';
 }
 
+/** Where the function actually runs, which is never where people read it.
+ * Behind the Hosting rewrite the `Host` header carries the Cloud Run name, and
+ * a banner that hands the app `https://invite-….run.app/e/<token>` is handing
+ * it a URL that belongs to no domain the app knows. */
+const INTERNAL_HOST = /\.(run\.app|cloudfunctions\.net)$/i;
+
 /**
  * The origin to hand back to the reader, from an untrusted `Host` header.
  *
  * It ends up inside the page as the banner's `app-argument`, so a header that
- * is not plainly a hostname is dropped for the canonical domain rather than
- * echoed back.
+ * is not plainly a hostname — or is the runtime's own internal name — is
+ * dropped for the canonical domain rather than echoed back. A public domain
+ * still wins, which is what keeps a custom domain working the day there is
+ * one.
  */
 function originFromHost(host) {
   const name = String(host ?? '');
+  if (INTERNAL_HOST.test(name)) return CANONICAL_ORIGIN;
 
   return /^[a-z0-9.-]{1,253}$/i.test(name)
     ? `https://${name}`

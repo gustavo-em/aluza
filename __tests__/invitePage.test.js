@@ -183,6 +183,14 @@ describe('the app-argument origin', () => {
       'https://ideiasorganizetask.web.app',
     );
     expect(originFromHost('evil.example/"><script>')).toBe(CANONICAL_ORIGIN);
+    // Behind the Hosting rewrite the Host header is the runtime's own name,
+    // and the banner must not hand the app a URL on a domain it never heard of.
+    expect(originFromHost('invite-h7ym6jmf3a-uc.a.run.app')).toBe(
+      CANONICAL_ORIGIN,
+    );
+    expect(originFromHost('invite.us-central1.cloudfunctions.net')).toBe(
+      CANONICAL_ORIGIN,
+    );
     expect(originFromHost(undefined)).toBe(CANONICAL_ORIGIN);
   });
 });
