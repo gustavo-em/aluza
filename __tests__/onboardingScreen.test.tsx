@@ -53,8 +53,15 @@ describe('first-run walk-through', () => {
     const tree = renderOnboarding(onFinish, true);
     const copy = getTaskCopy('pt-BR');
 
-    press(tree.root.findByProps({ testID: 'onboarding-next' }));
-    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+    // No swiping to get there: somebody who tapped an invite link opens on the
+    // page about the invite. They used to land on the first page of the pitch,
+    // three screens away from the only thing they came for.
+    expect(
+      tree.root.findAllByProps({ testID: 'onboarding-next' }),
+    ).toHaveLength(0);
+    expect(
+      tree.root.findByProps({ testID: 'onboarding-dot-2' }).props.$active,
+    ).toBe(true);
 
     const texts = tree.root
       .findAll(node => (node.type as unknown) === 'Text')
@@ -105,9 +112,6 @@ describe('first-run walk-through', () => {
   it('keeps the third door shut for somebody the app already holds an invite for', () => {
     const onFinish = jest.fn();
     const tree = renderOnboarding(onFinish, true);
-
-    press(tree.root.findByProps({ testID: 'onboarding-next' }));
-    press(tree.root.findByProps({ testID: 'onboarding-next' }));
 
     // Their link is already here; asking them to paste one would be asking
     // for what the app is holding.

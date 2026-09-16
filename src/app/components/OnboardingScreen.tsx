@@ -148,12 +148,27 @@ export function OnboardingScreen({
   invited = false,
   onFinish,
 }: OnboardingScreenProps) {
-  const [step, setStep] = useState(0);
+  const inviteStep = Math.max(
+    0,
+    Math.min(
+      onboardingSteps.findIndex(page => page.id === 'invite'),
+      copy.onboarding.steps.length - 1,
+    ),
+  );
+  // Somebody who arrived holding an invite opens on the page about it. They
+  // tapped a link: making them swipe through the pitch first is three screens
+  // between them and the one thing they asked for, and the first of those
+  // screens is the one they were landing on before this.
+  const [step, setStep] = useState(invited ? inviteStep : 0);
   const [pageWidth, setPageWidth] = useState(0);
   const window = useWindowDimensions();
   const pager = useRef<ComponentRef<typeof ScrollView> | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const ground = useSharedValue(0);
+  /** The link is read after the first frame — from the launch URL, or from
+   * the store install on Android — so the jump has to survive arriving late.
+   * Once, though: somebody who swipes back to the first page meant to. */
+  const jumpedToInvite = useRef(invited);
 
   const steps = copy.onboarding.steps;
   const total = Math.min(steps.length, onboardingSteps.length);
@@ -176,6 +191,14 @@ export function OnboardingScreen({
     // scrolls on its own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width]);
+
+  useEffect(() => {
+    if (!invited || jumpedToInvite.current) return;
+
+    jumpedToInvite.current = true;
+    setStep(inviteStep);
+    pager.current?.scrollTo({ x: inviteStep * width, animated: false });
+  }, [invited, inviteStep, width]);
 
   // The floor crosses from Sol to Tinta and back under the sliding pages. The
   // pages themselves are transparent, so the colour change reads as one
