@@ -105,4 +105,55 @@ describe('entrance screen', () => {
       expect(tree.root.findByProps({ testID: id }).props.disabled).toBe(true);
     }
   });
+
+  it('shows the wait on the button that started it', () => {
+    // The provider's sheet can take several seconds to answer, and the screen
+    // behind it used to hold still: same words, same glyph, nothing moving.
+    const copy = getAuthCopy('pt-BR');
+    const tree = renderEntrance(
+      {},
+      { googleState: { status: 'submitting', errorKind: null } },
+    );
+
+    expect(
+      tree.root.findAllByProps({ testID: 'entrance-google-waiting' }).length,
+    ).toBeGreaterThan(0);
+
+    const button = tree.root.findByProps({ testID: 'entrance-google' });
+    expect(button.props.accessibilityState).toEqual({
+      busy: true,
+      disabled: true,
+    });
+    expect(button.props.accessibilityLabel).toBe(copy.entrance.waiting);
+
+    const texts = tree.root
+      .findAll(node => (node.type as unknown) === 'Text')
+      .flatMap(node =>
+        node.children.filter(
+          (child): child is string => typeof child === 'string',
+        ),
+      );
+
+    expect(texts).toContain(copy.entrance.waiting);
+    expect(texts).not.toContain(copy.entrance.google);
+  });
+
+  it('keeps the waiting button at full strength while the others dim', () => {
+    // Dimming the button that is working says the app gave up on it. Waiting
+    // is not being unavailable.
+    const tree = renderEntrance(
+      {},
+      { googleState: { status: 'submitting', errorKind: null } },
+    );
+    const opacityOf = (id: string) =>
+      tree.root
+        .findByProps({ testID: id })
+        .findAll(node => Array.isArray(node.props?.style))
+        .flatMap(node => node.props.style.filter(Boolean))
+        .map((style: { opacity?: number }) => style?.opacity)
+        .find((opacity: number | undefined) => opacity != null);
+
+    expect(opacityOf('entrance-google')).toBeUndefined();
+    expect(opacityOf('entrance-email')).toBe(0.45);
+  });
 });

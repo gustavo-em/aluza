@@ -73,7 +73,10 @@ interface PressableScaleProps {
     expanded?: boolean;
     disabled?: boolean;
     /** Set while the control is waiting on something it started, so a screen
-     * reader says "busy" instead of reading a button that answers nothing. */
+     * reader says "busy" instead of reading a button that answers nothing.
+     * It also keeps the control at full strength while it waits: waiting is
+     * not being unavailable, and a spinner dimmed to 45% reads as a screen
+     * that has given up rather than one that is working. */
     busy?: boolean;
   };
   style?: StyleProp<ViewStyle>;
@@ -157,7 +160,13 @@ export function PressableScale({
       testID={testID}
     >
       <Animated.View
-        style={[arrangement, disabled ? styles.disabled : null, animatedStyle]}
+        style={[
+          arrangement,
+          disabled && accessibilityState?.busy !== true
+            ? styles.disabled
+            : null,
+          animatedStyle,
+        ]}
       >
         {children}
       </Animated.View>

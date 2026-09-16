@@ -13,6 +13,11 @@ export interface AuthCopy {
     apple: string;
     email: string;
     guest: string;
+    /** Shown in place of the provider's own label while its sheet is open and
+     * the account is being checked. The wait is the provider's, not the app's,
+     * and it can run for several seconds on a slow network — long enough that
+     * a screen with nothing moving on it reads as a screen that crashed. */
+    waiting: string;
     /** The way back to this screen from the email form behind it. */
     back: string;
     /** Somebody arrived by tapping an invite link. The entrance shows what
@@ -81,6 +86,11 @@ export interface AuthCopy {
   account: {
     label: string;
     signOut: string;
+    /** Asked only of a guest account: it lives on this phone alone, so
+     * leaving it is losing it, and one tap must not do that in silence. */
+    signOutGuestTitle: string;
+    signOutGuestBody: string;
+    signOutGuestConfirm: string;
     /** The last line of the tab, and the only red one. */
     delete: string;
   };
@@ -144,11 +154,12 @@ const pt: AuthCopy = {
     apple: 'Apple',
     email: 'E-mail',
     guest: 'Continuar só com nome',
+    waiting: 'Conectando…',
     back: 'Voltar',
     invited: {
       headline: (by, space) => `${by} te chamou para o espaço ${space}.`,
       lede: 'Vocês dois vão ver o mesmo dia: o que cada um levou e o que já fechou.',
-      today: 'Hoje, no combinado',
+      today: 'O dia de vocês',
       expired: 'Este convite expirou.',
       expiredHint: 'Peça um link novo para quem te chamou.',
       otherAccount: 'Alguém',
@@ -237,6 +248,10 @@ const pt: AuthCopy = {
   account: {
     label: 'Conta',
     signOut: 'Sair',
+    signOutGuestTitle: 'Sair da conta de convidado?',
+    signOutGuestBody:
+      'Ela existe só neste aparelho. Ao sair, suas tarefas e espaços somem daqui e não dá para entrar nela de novo. Para guardar tudo, vincule um e-mail ou o Google antes.',
+    signOutGuestConfirm: 'Sair mesmo assim',
     delete: 'Excluir conta',
   },
   deleteAccount: {
@@ -300,11 +315,12 @@ const en: AuthCopy = {
     apple: 'Apple',
     email: 'Email',
     guest: 'Continue with just a name',
+    waiting: 'Connecting…',
     back: 'Back',
     invited: {
       headline: (by, space) => `${by} invited you to the ${space} space.`,
       lede: 'You will both see the same day: what each of you took on and what is already done.',
-      today: 'Today, as agreed',
+      today: 'Your day together',
       expired: 'This invite has expired.',
       expiredHint: 'Ask whoever invited you for a new link.',
       otherAccount: 'Someone',
@@ -388,6 +404,10 @@ const en: AuthCopy = {
   account: {
     label: 'Account',
     signOut: 'Log out',
+    signOutGuestTitle: 'Log out of the guest account?',
+    signOutGuestBody:
+      'It only exists on this phone. Logging out takes your tasks and spaces with it, and there is no way back into it. To keep everything, link an e-mail or Google first.',
+    signOutGuestConfirm: 'Log out anyway',
     delete: 'Delete account',
   },
   deleteAccount: {

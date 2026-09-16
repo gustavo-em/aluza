@@ -1,4 +1,4 @@
-import { Platform, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import styled from 'styled-components/native';
@@ -75,8 +75,12 @@ export function EntranceScreen({
   // Three lines at most on the headline: a narrow phone drops a size rather
   // than breaking the promise into five.
   const headlineSize = window.width < 380 ? 34 : 40;
-  const isBusy =
-    googleState.status === 'submitting' || appleState.status === 'submitting';
+  // Which one is waiting matters as much as whether something is: the button
+  // that was tapped keeps its full strength and shows the wait, and the others
+  // dim because they cannot be answered until it finishes.
+  const googleWaiting = googleState.status === 'submitting';
+  const appleWaiting = appleState.status === 'submitting';
+  const isBusy = googleWaiting || appleWaiting;
   // Apple's sign-in only exists on iOS, and the guidelines do not allow
   // offering it where it cannot run.
   const showsApple = Platform.OS === 'ios';
@@ -122,27 +126,46 @@ export function EntranceScreen({
           )}
 
           <Primary
-            accessibilityLabel={entrance.google}
-            accessibilityState={{ busy: isBusy, disabled: isBusy }}
+            accessibilityLabel={
+              googleWaiting ? entrance.waiting : entrance.google
+            }
+            accessibilityState={{ busy: googleWaiting, disabled: isBusy }}
             disabled={isBusy}
             onPress={onGoogle}
             testID="entrance-google"
           >
-            <GoogleGlyph size={18} />
-            <PrimaryText>{entrance.google}</PrimaryText>
+            {googleWaiting ? (
+              <Waiting color="#fffdf7" testID="entrance-google-waiting" />
+            ) : (
+              <GoogleGlyph size={18} />
+            )}
+            <PrimaryText>
+              {googleWaiting ? entrance.waiting : entrance.google}
+            </PrimaryText>
           </Primary>
 
           <SecondRow>
             {showsApple ? (
               <Secondary
-                accessibilityLabel={copy.login.apple}
-                accessibilityState={{ busy: isBusy, disabled: isBusy }}
+                accessibilityLabel={
+                  appleWaiting ? entrance.waiting : copy.login.apple
+                }
+                accessibilityState={{ busy: appleWaiting, disabled: isBusy }}
                 disabled={isBusy}
                 onPress={onApple}
                 testID="entrance-apple"
               >
-                <AppleGlyph color={brandGround.onSol} size={16} />
-                <SecondaryText>{entrance.apple}</SecondaryText>
+                {appleWaiting ? (
+                  <Waiting
+                    color={brandGround.onSol}
+                    testID="entrance-apple-waiting"
+                  />
+                ) : (
+                  <AppleGlyph color={brandGround.onSol} size={16} />
+                )}
+                <SecondaryText>
+                  {appleWaiting ? entrance.waiting : entrance.apple}
+                </SecondaryText>
               </Secondary>
             ) : null}
 
@@ -181,6 +204,17 @@ export function EntranceScreen({
       </Safe>
     </Ground>
   );
+}
+
+/**
+ * The wait, in the place the provider's mark had.
+ *
+ * It sits where the glyph was and the word beside it changes with it, so the
+ * button neither changes height nor loses the row it was arranged in — the
+ * screen answers the tap instead of freezing under the provider's sheet.
+ */
+function Waiting({ color, testID }: { color: string; testID: string }) {
+  return <ActivityIndicator color={color} size={18} testID={testID} />;
 }
 
 /** The email button's glyph. Drawn here rather than pulled from the field
