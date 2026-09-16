@@ -76,6 +76,26 @@
         "type": 301
       },
       {
+        "source": "/privacy-policy",
+        "destination": "/privacidade#en",
+        "type": 301
+      },
+      {
+        "source": "/terms",
+        "destination": "/termos#en",
+        "type": 301
+      },
+      {
+        "source": "/delete-account",
+        "destination": "/exclusao-de-conta#en",
+        "type": 301
+      },
+      {
+        "source": "/account-deletion",
+        "destination": "/exclusao-de-conta#en",
+        "type": 301
+      },
+      {
         "source": "/lesingo/privacy-policy",
         "destination": "/lesingo/privacidade#en",
         "type": 301
