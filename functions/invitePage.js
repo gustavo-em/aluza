@@ -98,6 +98,69 @@ function smartAppBanner(token, origin, stores) {
 }
 
 /**
+ * Chrome's own road from a page to an app.
+ *
+ * Safari has the Smart App Banner; Chrome on Android has the intent URL: it
+ * opens the app when it is installed and falls through to the Play listing
+ * when it is not, and the invite rides along both ways — as the App Link the
+ * app receives, or as the `referrer` Play hands it after the install.
+ */
+function androidIntentUrl(origin, token, stores) {
+  const host = origin.replace(/^https?:\/\//, '');
+
+  return (
+    `intent://${host}/e/${token}#Intent;scheme=https;` +
+    `package=${stores.androidPackage};` +
+    `S.browser_fallback_url=${encodeURIComponent(
+      playUrl(stores.androidPackage, token),
+    )};end`
+  );
+}
+
+/**
+ * The strip at the top of the page: icon, name, one verb.
+ *
+ * Safari draws a banner of its own above the page, but only Safari does —
+ * the same link opened from WhatsApp's or Instagram's in-app browser shows
+ * nothing, and Chrome on Android never had one. So the page carries its own,
+ * on every platform that has a store to point at: it is the first thing the
+ * eye lands on, and it says what the whole page is for before the reader
+ * gets to the steps. Nothing on it depends on the reader's browser.
+ */
+function installBanner(platform, token, origin, stores) {
+  const ios = stores.appleAppId !== '';
+  const android = stores.androidPackage !== '';
+  let href = null;
+  let action = '';
+  let line = '';
+
+  if (platform === 'android' && android) {
+    href = androidIntentUrl(origin, token, stores);
+    action = 'Abrir';
+    line = 'Abre no app, ou instala pela Play Store.';
+  } else if (platform === 'ios' && ios) {
+    href = appStoreUrl(stores.appleAppId);
+    action = 'Instalar';
+    line = 'Grátis na App Store. Depois, cole o código.';
+  } else if (platform === 'other' && (ios || android)) {
+    href = ios
+      ? appStoreUrl(stores.appleAppId)
+      : playUrl(stores.androidPackage, token);
+    action = 'Baixar';
+    line = ios && android ? 'Para iPhone e Android.' : 'Grátis, no celular.';
+  }
+
+  if (href == null) return '';
+
+  return (
+    `<a class="banner" href="${href}">` +
+    `<img class="banner-icon" src="${origin}/img/aluza-mark.svg" alt="">` +
+    `<span class="banner-text"><b>Aluza</b><small>${line}</small></span>` +
+    `<span class="banner-cta">${action}</span></a>`
+  );
+}
+
+/**
  * The download buttons, aimed at the phone that is reading.
  *
  * Reaching this page means the app is not installed — an iPhone or Android
@@ -201,6 +264,7 @@ function renderInvitePage({
   // The token is validated against `TOKEN` before anything is rendered, so it
   // is safe to drop into the script below without further escaping.
   const banner = smartAppBanner(token, origin, stores);
+  const strip = installBanner(platform, token, origin, stores);
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -250,28 +314,42 @@ ${banner}
     text-transform: uppercase; color: #FFC63D; margin-bottom: 6px;
   }
   .copy code {
-    display: block;
-    font: 800 26px ui-monospace, Menlo, monospace; color: #FFFDF7;
-    letter-spacing: 2px;
+    display: block; word-break: break-all;
+    font: 800 20px/1.3 ui-monospace, Menlo, monospace; color: #FFFDF7;
+    letter-spacing: 1px;
   }
   .copy-hint {
     display: block; margin-top: 8px; font-size: 12px; font-weight: 700;
     color: rgba(255,253,247,.72);
   }
   .note { text-align: center; font-size: 13px; color: rgba(27,23,16,.7); }
+  .banner {
+    display: flex; align-items: center; gap: 12px; text-decoration: none;
+    background: #fff; color: #1B1710; border-radius: 16px; padding: 10px 12px;
+    margin-bottom: 20px; box-shadow: 0 6px 20px rgba(27,23,16,.10);
+  }
+  .banner-icon { width: 44px; height: 44px; border-radius: 12px; flex: none; }
+  .banner-text { flex: 1; min-width: 0; line-height: 1.25; }
+  .banner-text b { display: block; font-size: 16px; }
+  .banner-text small { display: block; font-size: 12px; color: rgba(27,23,16,.7); }
+  .banner-cta {
+    flex: none; background: #1B1710; color: #FFC63D; font-weight: 800;
+    font-size: 14px; border-radius: 999px; padding: 9px 16px;
+  }
 </style>
 </head>
 <body>
 <main>
+  ${strip}
   <h1>${who} te chamou para o espaço ${name}.</h1>
   <p class="lede">Vocês dois vão ver o mesmo dia: o que cada um levou e o que já fechou.</p>
   ${
     preview.tasks.length === 0
       ? ''
-      : `<div class="card"><h2>Hoje, no combinado</h2><ul>${rows}</ul></div>`
+      : `<div class="card"><h2>No espaço</h2><ul>${rows}</ul></div>`
   }
   <ol class="steps">
-    <li>Instale o <b>Aluza</b>, um aplicativo de celular.</li>
+    <li>Instale o <b>Aluza</b>: pelo banner no topo ou pelo botão abaixo.</li>
     <li>Abra <b>Espaços</b> e toque em <b>Entrar com convite</b>.</li>
     <li>Cole o código abaixo.</li>
   </ol>
@@ -338,6 +416,8 @@ module.exports = {
   previewOf,
   platformOf,
   originFromHost,
+  androidIntentUrl,
+  installBanner,
   downloadButton,
   storeNote,
   renderInvitePage,

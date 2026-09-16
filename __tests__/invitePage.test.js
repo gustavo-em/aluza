@@ -155,6 +155,49 @@ describe('invite page, with both stores open', () => {
   });
 });
 
+describe('the strip at the top of the page', () => {
+  it('opens the app on Android, and falls through to the Play with the invite', () => {
+    const html = render(BOTH, 'android');
+    const fallback = encodeURIComponent(
+      `${PLAY_LINK}&referrer=${encodeURIComponent(`invite=${TOKEN}`)}`,
+    );
+
+    expect(html).toContain(
+      `<a class="banner" href="intent://ideiasorganizetask.web.app/e/${TOKEN}` +
+        `#Intent;scheme=https;package=com.ideiasorganizetask;` +
+        `S.browser_fallback_url=${fallback};end">`,
+    );
+    expect(html).toContain('<span class="banner-cta">Abrir</span>');
+    expect(html).toContain(`src="${CANONICAL_ORIGIN}/img/aluza-mark.svg"`);
+  });
+
+  it('points an iPhone at the App Store, beside Safari’s own banner', () => {
+    const html = render(APPLE_ONLY, 'ios');
+
+    expect(html).toContain(`<a class="banner" href="${APPLE_LINK}">`);
+    expect(html).toContain('<span class="banner-cta">Instalar</span>');
+  });
+
+  it('is not drawn where there is nothing to point at', () => {
+    expect(render(NO_STORE, 'android')).not.toContain('class="banner"');
+    expect(render(APPLE_ONLY, 'android')).not.toContain('class="banner"');
+  });
+
+  it('follows the domain the invite was opened on', () => {
+    expect(render(BOTH, 'android', 'https://aluza.app')).toContain(
+      `intent://aluza.app/e/${TOKEN}#Intent;`,
+    );
+  });
+
+  it('still tells the steps and offers the button, for a browser with no banner', () => {
+    const html = render(BOTH, 'android');
+
+    expect(html).toContain('pelo banner no topo ou pelo botão abaixo');
+    expect(html).toContain(`<a class="cta" href="${PLAY_LINK}`);
+    expect(html).toContain(`<code id="code">${TOKEN}</code>`);
+  });
+});
+
 describe('invite page, with only the Play open', () => {
   const PLAY_ONLY = {
     appleAppId: '',
@@ -214,9 +257,12 @@ describe('the store constants actually shipped', () => {
     expect(html).not.toContain(NOT_IN_STORES);
   });
 
-  it('offers no Play link while the listing is not live', () => {
-    expect(ANDROID_PACKAGE).toBe('');
-    expect(render(STORES, 'android')).not.toContain('play.google.com');
+  it('points at the Play listing by its package name', () => {
+    expect(ANDROID_PACKAGE).toBe('com.ideiasorganizetask');
+    expect(STORES.androidPackage).toBe(ANDROID_PACKAGE);
+    expect(render(STORES, 'android')).toContain(
+      `<a class="cta" href="${PLAY_LINK}`,
+    );
   });
 });
 
@@ -278,8 +324,15 @@ describe('the marketing site', () => {
     expect(docs).toContain(`ios: '${APPLE_LINK}'`);
   });
 
-  it('still waits on the Play, like the invite page does', () => {
-    expect(docs).toContain('Em breve no Google Play');
-    expect(docs).not.toContain("android:\n          'https://play.google.com");
+  it('sends people to the same Play listing as the invite', () => {
+    expect(docs).toContain(`'${PLAY_LINK}'`);
+  });
+
+  it('carries the App Store banner and reads the phone it is opened on', () => {
+    expect(docs).toContain(
+      '<meta name="apple-itunes-app" content="app-id=6808513680" />',
+    );
+    expect(docs).toContain('/iPhone|iPad|iPod/i.test(agente)');
+    expect(docs).toContain('/Android/i.test(agente)');
   });
 });

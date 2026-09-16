@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import styled from 'styled-components/native';
@@ -11,6 +12,7 @@ import {
 import type { AppearanceMode } from '../../../../app/theme/theme';
 import type { AuthCopy } from '../../../auth/presentation/localization/authCopy';
 import type { AppLanguage, TaskCopy } from '../localization/taskCopy';
+import { ConfirmDialog } from '../views/ConfirmDialog';
 import { PressableScale } from '../views/PressableScale';
 
 interface SettingsScreenProps {
@@ -22,6 +24,10 @@ interface SettingsScreenProps {
   languageChoice: LanguageChoice;
   /** The uid: with no account there is nothing to sign out of. */
   personId: string | null;
+  /** A guest account lives on this phone alone: leaving it is losing it, so
+   * the tap asks first. An account with an e-mail or Google behind it can
+   * be entered again, and leaves without a question. */
+  isAnonymous?: boolean;
   version: string;
   /** Whether a shared project may notify. On by default. */
   projectActivityNotifications: boolean;
@@ -69,6 +75,7 @@ export function SettingsScreen({
   dayCapacity,
   languageChoice,
   personId,
+  isAnonymous = false,
   version,
   projectActivityNotifications,
   projectActivityBlocked,
@@ -81,6 +88,8 @@ export function SettingsScreen({
   onDeleteAccount,
   onReplayOnboarding,
 }: SettingsScreenProps) {
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+
   return (
     <Content>
       <Card entering={contentEnter(2)}>
@@ -236,7 +245,9 @@ export function SettingsScreen({
             <PressableLine
               accessibilityLabel={accountCopy.account.signOut}
               accessibilityRole="button"
-              onPress={onSignOut}
+              onPress={
+                isAnonymous ? () => setConfirmingSignOut(true) : onSignOut
+              }
               testID="settings-sign-out"
             >
               <Row>
@@ -261,6 +272,21 @@ export function SettingsScreen({
           </>
         )}
       </Card>
+      {confirmingSignOut ? (
+        <ConfirmDialog
+          body={accountCopy.account.signOutGuestBody}
+          cancelLabel={copy.today.removeCancel}
+          confirmLabel={accountCopy.account.signOutGuestConfirm}
+          destructive
+          onCancel={() => setConfirmingSignOut(false)}
+          onConfirm={() => {
+            setConfirmingSignOut(false);
+            onSignOut();
+          }}
+          testID="sign-out-confirm"
+          title={accountCopy.account.signOutGuestTitle}
+        />
+      ) : null}
     </Content>
   );
 }

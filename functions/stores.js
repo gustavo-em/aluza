@@ -16,19 +16,18 @@
  * A wrong number here sends the person to another company's app, so check it
  * the same way before ever changing it.
  *
- * `ANDROID_PACKAGE` stays empty until the Play listing is actually live
- * (expected 2026-09-13). On that day the only change needed here is:
- *
- *   const ANDROID_PACKAGE = 'com.ideiasorganizetask';
- *
- * followed by `firebase deploy --only functions,hosting`. The matching line on
+ * `ANDROID_PACKAGE` is the Play listing's package name. It was filled in on
+ * 2026-09-15, in the week the listing goes live: until Google publishes it,
+ * the Play link lands on the store's "not found" page. Emptying it again
+ * (`''`) takes the button off the page and brings the "coming soon" line
+ * back, with `firebase deploy --only functions,hosting`. The matching line on
  * the site is `LOJAS.android` in `docs/index.html` and `public/index.html`.
  *
  * It is kept as a package name rather than a URL because the Play link is
  * built with the invite token attached.
  */
 const APPLE_APP_ID = '6808513680';
-const ANDROID_PACKAGE = '';
+const ANDROID_PACKAGE = 'com.ideiasorganizetask';
 
 function appStoreUrl(appleAppId) {
   return `https://apps.apple.com/app/id${appleAppId}`;

@@ -112,6 +112,10 @@ async function tokensOf(uid) {
 // The public preview behind an invite link. Lives in its own file: it has
 // nothing to do with notifications beyond sharing this project.
 exports.invite = require('./invite').invite;
+// A note in, task lines out — the batch capture sheet's reader on the server.
+exports.interpretCapture = require('./interpret').interpretCapture;
+// The same reader, fed by a recording instead of by typing.
+exports.voiceCapture = require('./voice').voiceCapture;
 
 exports.onSharedProjectWritten = onDocumentWritten(
   'sharedLists/{token}',

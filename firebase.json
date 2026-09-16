@@ -53,6 +53,14 @@
       {
         "source": "/e/**",
         "function": "invite"
+      },
+      {
+        "source": "/api/interpret",
+        "function": "interpretCapture"
+      },
+      {
+        "source": "/api/voice",
+        "function": "voiceCapture"
       }
     ],
     "cleanUrls": true,
@@ -65,6 +73,21 @@
       {
         "source": "/lesingo/privacy",
         "destination": "/lesingo/privacidade#en",
+        "type": 301
+      },
+      {
+        "source": "/lesingo/privacy-policy",
+        "destination": "/lesingo/privacidade#en",
+        "type": 301
+      },
+      {
+        "source": "/lesingo/delete-account",
+        "destination": "/lesingo/exclusao-de-conta#en",
+        "type": 301
+      },
+      {
+        "source": "/lesingo/account-deletion",
+        "destination": "/lesingo/exclusao-de-conta#en",
         "type": 301
       },
       {

@@ -9,6 +9,10 @@
       content="Aluza é o app de tarefas e listas compartilhadas para casal, família e amigos. Escreva a tarefa como você falaria; o dia mostra três, não quarenta e sete."
     />
     <meta name="theme-color" content="#FFC63D" />
+    <!-- Safari's own banner to the App Store, for whoever reads this on an
+         iPhone. The id came from the lookup API by bundle id, the same one
+         functions/stores.js carries. -->
+    <meta name="apple-itunes-app" content="app-id=6808513680" />
     <link rel="icon" href="img/aluza-mark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="img/aluza-mark.svg" />
     <meta property="og:type" content="website" />
@@ -991,7 +995,7 @@
         <article class="mostra-item reveal">
           <div class="mostra-copy">
             <p class="eyebrow">Combinado</p>
-            <h2>Hoje, no combinado.</h2>
+            <h2>O dia de vocês.</h2>
             <p>
               Dentro do espaço, cada tarefa mostra quem levou. Quando alguém
               fecha uma, os outros ficam sabendo e os pontos vão para quem fez.
@@ -1205,14 +1209,25 @@
     <script>
       /* Uma URL por loja: preenchida, o botão deixa de dizer "Em breve" e
      passa a levar para a loja. A da Apple veio do lookup por bundle
-     (com.aluza.app → trackId 6808513680), conferido em 2026-09-10. O Android
-     entra no dia em que a ficha da Play ficar no ar, e a mesma linha existe
-     em ANDROID_PACKAGE, em functions/stores.js. */
+     (com.aluza.app → trackId 6808513680), conferido em 2026-09-10. A da Play
+     é a ficha do package com.ideiasorganizetask (a mesma linha existe em
+     ANDROID_PACKAGE, em functions/stores.js); a ficha entra no ar na semana
+     de 2026-09-15, e até lá o link cai na página "não encontrado" da Play. */
       var LOJAS = {
         ios: 'https://apps.apple.com/app/id6808513680',
         android:
-          '' /* ex.: 'https://play.google.com/store/apps/details?id=com.ideiasorganizetask' */,
+          'https://play.google.com/store/apps/details?id=com.ideiasorganizetask',
       };
+
+      /* A loja do próprio aparelho vem primeiro e em destaque; a outra fica
+     como segundo botão, discreto, para quem vai mandar o link a alguém com o
+     outro sistema. No computador a ordem é a de sempre, iPhone primeiro. */
+      var agente = navigator.userAgent || '';
+      var aparelho = /iPhone|iPad|iPod/i.test(agente)
+        ? 'ios'
+        : /Android/i.test(agente)
+        ? 'android'
+        : null;
 
       document.querySelectorAll('[data-store]').forEach(function (botao) {
         var url = LOJAS[botao.dataset.store];
@@ -1223,6 +1238,21 @@
           botao.dataset.store === 'ios'
             ? 'Baixar na App Store'
             : 'Baixar no Google Play';
+      });
+
+      document.querySelectorAll('.btn-row').forEach(function (linha) {
+        var botoes = Array.prototype.slice.call(
+          linha.querySelectorAll('[data-store]'),
+        );
+        if (botoes.length < 2) return;
+
+        var principal = aparelho || 'ios';
+        botoes.forEach(function (botao) {
+          var propria = botao.dataset.store === principal;
+          botao.classList.toggle('btn-dark', propria);
+          botao.classList.toggle('btn-ghost', !propria);
+          if (propria) linha.insertBefore(botao, linha.firstChild);
+        });
       });
 
       var topo = document.getElementById('topo');
