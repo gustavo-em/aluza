@@ -6,9 +6,14 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
+  Easing,
+  cancelAnimation,
   useAnimatedKeyboard,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
 import styled, { useTheme } from 'styled-components/native';
 
@@ -20,6 +25,7 @@ import {
   reminderMorningAtMs,
   reminderDayOptions,
 } from '../../domain/DeadlineReminder';
+import { splitCaptureBatch } from '../../domain/CaptureBatch';
 import { parseCapture } from '../../domain/QuickCapture';
 import {
   addSubtask,
@@ -34,7 +40,11 @@ import {
   type TaskPriority,
 } from '../../domain/Task';
 import { nextOccurrenceAtMs } from '../../domain/Reminder';
-import { findListByName, type TaskList } from '../../domain/TaskList';
+import {
+  findListByName,
+  type ListMember,
+  type TaskList,
+} from '../../domain/TaskList';
 import type { AppLanguage, TaskCopy } from '../localization/taskCopy';
 import { CalendarPanel } from './CalendarPanel';
 import { formatDateLabel, formatDayLabel } from '../models/dateLabel';
@@ -42,6 +52,8 @@ import {
   BellGlyph,
   CalendarGlyph,
   ChevronGlyph,
+  MicGlyph,
+  PeopleGlyph,
   PlayGlyph,
   PlusGlyph,
   PriorityGlyph,
@@ -49,6 +61,7 @@ import {
   TagGlyph,
   TrashGlyph,
 } from './FieldGlyphs';
+import { AssignPanel } from './AssignPanel';
 import { ListPanel } from './ListPanel';
 import {
   openSystemNotificationSettings,
@@ -73,10 +86,13 @@ import {
   scrimEnter,
   scrimExit,
   sectionLayout,
-  sheetExit,
-  sheetSlideEnter,
 } from '../../../../app/animation/motion';
+import {
+  sheetAnchor,
+  useSheetRise,
+} from '../../../../app/animation/useSheetRise';
 import { displayNameOf } from '../models/listName';
+import { memberDisplayName } from '../models/memberIdentity';
 
 /** What an existing task looks like when the same sheet is used to change it. */
 export interface SheetSubject {
@@ -97,6 +113,14 @@ export interface SheetSubject {
   /** True for a task already ticked. The type cannot be changed there: turning
    * finished work into memory would quietly take back what it paid. */
   completed?: boolean;
+}
+
+/** Everybody in the shared space a task is being written for. */
+export interface CaptureAssignment {
+  members: readonly ListMember[];
+  /** The signed-in account, preselected: the person writing a task is the
+   * likeliest to be the one taking it. */
+  personId: string;
 }
 
 interface QuickCaptureSheetProps {
@@ -135,6 +159,20 @@ interface QuickCaptureSheetProps {
   /** Who took this task, for a task inside a shared project. Absent
    * everywhere else, and then the sheet is exactly the one it always was. */
   assignment?: TaskAssignment;
+  /** Who can take the task while it is still being written, so it does not
+   * have to be reopened just to be given to somebody. Absent outside a
+   * shared space, and while editing, where `assignment` covers it. */
+  captureAssignment?: CaptureAssignment;
+  /** Speaking instead of typing. Present only where a note can be spoken:
+   * a new task, never an edit and never a reminder or a group, which the
+   * reader on the server does not produce. */
+  onStartVoice?: () => void;
+  /** The one line under the big microphone, and the spoken example under it
+   * while nobody has used it yet. */
+  voiceUsed?: boolean;
+  /** Where the batch sheet exists: what was typed looks like several tasks,
+   * and one tap hands it over instead of saving it as one long title. */
+  onSplitBatch?: (text: string) => void;
   onSubmit: (
     typed: string,
     overrides: CaptureOverrides,
@@ -170,6 +208,10 @@ export function QuickCaptureSheet({
   onToggleSubtask,
   onDeleteSubtask,
   assignment,
+  captureAssignment,
+  onStartVoice,
+  voiceUsed = false,
+  onSplitBatch,
   onSubmit,
 }: QuickCaptureSheetProps) {
   const theme = useTheme();
@@ -276,9 +318,45 @@ export function QuickCaptureSheet({
   // on its way.
   const pendingSubtaskText = useRef('');
 
+  // Who takes the task, decided while it is written. Starts on the person
+  // writing it — the likeliest answer — and is theirs to change in the panel.
+  const [assignedIds, setAssignedIds] = useState<readonly string[]>(() =>
+    captureAssignment == null ? [] : [captureAssignment.personId],
+  );
+
   // Task or reminder, chosen before anything else: the two are written with
   // different fields, and the sheet says which one it is showing.
   const [kind, setKind] = useState<TaskKind>(editing?.kind ?? 'task');
+  /** Whether speaking is on offer here: a new task, never an edit, and never
+   * a reminder or a group — the reader on the server writes tasks. */
+  const speakable = onStartVoice != null && !isEditing && kind === 'task';
+  /** Enough room under the keyboard for more than the button itself. */
+  const roomy = windowHeight >= 760;
+  const rise = useSheetRise();
+  const pulse = useSharedValue(0);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!speakable || typed.length > 0 || prefersReducedMotion) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
+
+    pulse.value = 0;
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }),
+      -1,
+      false,
+    );
+
+    return () => cancelAnimation(pulse);
+  }, [prefersReducedMotion, pulse, speakable, typed.length]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.32 * (1 - pulse.value),
+    transform: [{ scale: 1 + 0.55 * pulse.value }],
+  }));
   const [recurrence, setRecurrence] = useState<ReminderRecurrence>(
     editing?.recurrence ?? 'once',
   );
@@ -297,7 +375,7 @@ export function QuickCaptureSheet({
   const [isReminderBlocked, setIsReminderBlocked] = useState(false);
 
   const [panel, setPanel] = useState<
-    'none' | 'date' | 'list' | 'listNew' | 'syntax' | 'reminder'
+    'none' | 'date' | 'list' | 'listNew' | 'syntax' | 'reminder' | 'assign'
   >('none');
   // The sheet opens on its smallest layer: a field and two ways in. Editing is
   // the exception — the chips are the whole point of reopening a task. This is
@@ -305,6 +383,13 @@ export function QuickCaptureSheet({
   const [expanded, setExpanded] = useState(isEditing);
 
   const priority = priorityOverride ?? draft.priority;
+  // How many tasks the text looks like. Two or more, and the sheet says so
+  // above the chips, with the way into the batch beside it — the one place
+  // that reading happens without anybody asking for the batch first.
+  const detectedPieces =
+    onSplitBatch == null || isEditing || isReminderKind
+      ? 0
+      : splitCaptureBatch(typed).length;
   // A task written now is a task for now: a new capture starts on today rather
   // than with no date at all. What the text says still wins — typing "sexta"
   // moves it — and the chip stays a way out, to another day or to none.
@@ -420,11 +505,31 @@ export function QuickCaptureSheet({
   // the start — "sem aviso" is an answer the person can read, not a setting
   // to go looking for.
   const showReminder = !isReminderKind && dueAtMs != null;
+  // Inside a shared space the chip is on from the start, because it already
+  // carries an answer — the person writing — and an answer is never hidden.
+  const showAssign = captureAssignment != null && !isEditing && !isReminderKind;
+  // What the chip says: the people on the task by the names the space knows
+  // them by, the reader as "Você".
+  const assignNames =
+    captureAssignment == null
+      ? ''
+      : captureAssignment.members
+          .filter(member => assignedIds.includes(member.personId))
+          .map(member =>
+            member.personId === captureAssignment.personId
+              ? copy.lists.memberYou
+              : memberDisplayName(member, copy.lists.memberSomeone),
+          )
+          .join(', ');
+  const assignLabel =
+    assignNames.length === 0 ? copy.capture.assignNobody : assignNames;
+  const assignSet = assignedIds.length > 0;
   const showChips =
     showDate ||
     showPriority ||
     showList ||
     showReminder ||
+    showAssign ||
     (!isReminderKind && estimateMinutes != null);
 
   useEffect(() => {
@@ -459,7 +564,7 @@ export function QuickCaptureSheet({
 
   /** Date and list have more answers than a tap can cycle through, so each
    * opens its own panel. The keyboard steps aside to make room for it. */
-  function openPanel(next: 'date' | 'list' | 'reminder') {
+  function openPanel(next: 'date' | 'list' | 'reminder' | 'assign') {
     setPanel(current => {
       const opening = current !== next;
 
@@ -558,6 +663,9 @@ export function QuickCaptureSheet({
         ...(initialGroupId == null || isEditing
           ? {}
           : { groupId: initialGroupId }),
+        // Who takes it, as the chip said. The use case keeps only members of
+        // the space the task actually lands in.
+        ...(showAssign ? { assignedIds } : {}),
       },
       Date.now() - openedAt.current,
     );
@@ -580,15 +688,11 @@ export function QuickCaptureSheet({
         />
       </Scrim>
       <Lift style={lift}>
-        <Sheet
-          entering={sheetSlideEnter()}
-          exiting={sheetExit()}
-          onLayout={traceOpen}
-          style={[floor, ceiling]}
-        >
+        <Sheet onLayout={traceOpen} style={[floor, ceiling, rise]}>
           <Grabber />
 
           <Body
+            contentContainerStyle={{ paddingBottom: theme.spacing.medium }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -682,8 +786,21 @@ export function QuickCaptureSheet({
               stays above it with transparent glyphs, preserving its native
               caret, selection, correction and keyboard behavior. */}
             <FieldStage>
+              {/* Speaking is the other way in, and it stays visible while
+                  somebody types: small, beside what they are writing. */}
+              {speakable && typed.length > 0 ? (
+                <InlineMic
+                  accessibilityLabel={copy.capture.voice.differential}
+                  accessibilityRole="button"
+                  onPress={onStartVoice}
+                  testID="capture-voice-inline"
+                >
+                  <MicGlyph color={theme.colors.accentInk} size={18} />
+                </InlineMic>
+              ) : null}
               {typed.length === 0 ? null : (
                 <HighlightLine
+                  $inset={speakable}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                   pointerEvents="none"
@@ -704,6 +821,7 @@ export function QuickCaptureSheet({
                 </HighlightLine>
               )}
               <Field
+                $inset={speakable && typed.length > 0}
                 accessibilityLabel={copy.capture.placeholder}
                 autoCorrect={false}
                 blurOnSubmit={false}
@@ -718,6 +836,61 @@ export function QuickCaptureSheet({
                 value={typed}
               />
             </FieldStage>
+
+            {/* An empty field is where speaking is the better offer, so the
+                microphone is the big one until there is something written. */}
+            {speakable && typed.length === 0 ? (
+              <SpeakArea>
+                <SpeakStage>
+                  {/* A ring breathing out of the disc: the one thing on an
+                      empty sheet that says this is worth a tap. */}
+                  <SpeakPulse pointerEvents="none" style={pulseStyle} />
+                  <SpeakDisc
+                    accessibilityHint={copy.capture.voice.voicePromise}
+                    accessibilityLabel={copy.capture.voice.differential}
+                    accessibilityRole="button"
+                    onPress={onStartVoice}
+                    testID="capture-voice"
+                  >
+                    <MicGlyph color={theme.colors.accentInk} size={27} />
+                  </SpeakDisc>
+                </SpeakStage>
+                <SpeakLead>{copy.capture.voice.differential}</SpeakLead>
+                {/* The keyboard is up the whole time this sheet is open, so
+                    what is under the microphone has to earn its height. On a
+                    short phone the promise and the example are what give way
+                    — never the button itself. */}
+                {roomy ? (
+                  <SpeakPromise>{copy.capture.voice.voicePromise}</SpeakPromise>
+                ) : null}
+                {roomy && !voiceUsed ? (
+                  <SpeakExample>{copy.capture.voice.readyExample}</SpeakExample>
+                ) : null}
+              </SpeakArea>
+            ) : null}
+
+            {detectedPieces >= 2 ? (
+              <DetectedBar
+                entering={disclosureEnter()}
+                exiting={fadeExit()}
+                testID="capture-detected-batch"
+              >
+                <DetectedText>
+                  {copy.capture.batch.detected(detectedPieces)}
+                </DetectedText>
+                <DetectedAction
+                  accessibilityLabel={copy.capture.batch.split}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => onSplitBatch?.(typed)}
+                  testID="capture-split-batch"
+                >
+                  <DetectedActionText>
+                    {copy.capture.batch.split}
+                  </DetectedActionText>
+                </DetectedAction>
+              </DetectedBar>
+            ) : null}
 
             {showChips ? (
               <Chips layout={sectionLayout()}>
@@ -861,6 +1034,41 @@ export function QuickCaptureSheet({
                   </ChipSlot>
                 ) : null}
 
+                {showAssign ? (
+                  <ChipSlot entering={disclosureEnter()} exiting={fadeExit()}>
+                    <ListChip
+                      $open={panel === 'assign'}
+                      $set={assignSet}
+                      accessibilityLabel={copy.capture.assignChipLabel(
+                        assignLabel,
+                      )}
+                      accessibilityState={{ expanded: panel === 'assign' }}
+                      onPress={() => openPanel('assign')}
+                      testID="capture-chip-assign"
+                    >
+                      <ChipGlyph>
+                        <PeopleGlyph
+                          color={
+                            assignSet || panel === 'assign'
+                              ? theme.colors.onSelected
+                              : theme.colors.muted
+                          }
+                          size={14}
+                        />
+                      </ChipGlyph>
+                      <ChipText
+                        $color={
+                          assignSet || panel === 'assign'
+                            ? 'onSelected'
+                            : 'muted'
+                        }
+                      >
+                        {assignLabel}
+                      </ChipText>
+                    </ListChip>
+                  </ChipSlot>
+                ) : null}
+
                 {estimateMinutes == null ? null : (
                   <ChipSlot entering={disclosureEnter()} exiting={fadeExit()}>
                     <EstimateChip
@@ -959,6 +1167,22 @@ export function QuickCaptureSheet({
                 }}
                 onCreateNew={() => setPanel('listNew')}
                 selectedId={listId}
+              />
+            ) : null}
+
+            {panel === 'assign' && captureAssignment != null ? (
+              <AssignPanel
+                assignedIds={assignedIds}
+                copy={copy}
+                members={captureAssignment.members}
+                onToggle={personId =>
+                  setAssignedIds(current =>
+                    current.includes(personId)
+                      ? current.filter(id => id !== personId)
+                      : [...current, personId],
+                  )
+                }
+                personId={captureAssignment.personId}
               />
             ) : null}
 
@@ -1289,6 +1513,7 @@ const ScrimTouch = styled.Pressable`
 `;
 
 const Lift = styled(Animated.View)`
+  ${sheetAnchor}
   width: 100%;
 `;
 
@@ -1418,6 +1643,74 @@ const Grabber = styled.View`
   margin-bottom: ${({ theme }) => theme.spacing.medium}px;
 `;
 
+/* The microphone while something is being written: 36 on the field's own
+   right, small enough that the words keep the line. */
+const InlineMic = styled(PressableScale)`
+  align-items: center;
+  background-color: ${({ theme }) => theme.colors.accent};
+  border-radius: ${({ theme }) => theme.radii.pill}px;
+  height: 36px;
+  justify-content: center;
+  position: absolute;
+  right: 0px;
+  top: 6px;
+  width: 36px;
+  z-index: 2;
+`;
+
+const SpeakArea = styled.View`
+  align-items: center;
+  margin-top: ${({ theme }) => theme.spacing.medium}px;
+`;
+
+const SpeakStage = styled.View`
+  align-items: center;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+`;
+
+const SpeakPulse = styled(Animated.View)`
+  background-color: ${({ theme }) => theme.colors.accent};
+  border-radius: ${({ theme }) => theme.radii.pill}px;
+  height: 64px;
+  position: absolute;
+  width: 64px;
+`;
+
+const SpeakPromise = styled.Text`
+  color: ${({ theme }) => theme.colors.muted};
+  font-size: 12px;
+  line-height: 17px;
+  margin-top: 6px;
+  max-width: 300px;
+  text-align: center;
+`;
+
+const SpeakDisc = styled(PressableScale)`
+  align-items: center;
+  background-color: ${({ theme }) => theme.colors.accent};
+  border-radius: ${({ theme }) => theme.radii.pill}px;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+`;
+
+const SpeakLead = styled.Text`
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  text-align: center;
+`;
+
+const SpeakExample = styled.Text`
+  color: ${({ theme }) => theme.colors.muted};
+  font-size: 12px;
+  margin-top: 2px;
+  text-align: center;
+`;
+
 const FieldStage = styled.View`
   position: relative;
   min-height: 62px;
@@ -1431,12 +1724,12 @@ const fieldText = `
   letter-spacing: -0.3px;
 `;
 
-const HighlightLine = styled.Text`
+const HighlightLine = styled.Text<{ $inset?: boolean }>`
   ${fieldText}
   position: absolute;
   top: 0px;
   left: 0px;
-  right: 0px;
+  right: ${({ $inset }) => ($inset ? 48 : 0)}px;
   min-height: 56px;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -1448,7 +1741,7 @@ const RecognizedText = styled.Text`
   border-radius: ${({ theme }) => theme.spacing.tiny}px;
 `;
 
-const Field = styled.TextInput.attrs(({ theme }) => ({
+const Field = styled.TextInput.attrs<{ $inset?: boolean }>(({ theme }) => ({
   placeholderTextColor: theme.colors.muted,
   // Glyphs are painted by HighlightLine. The native field keeps the caret,
   // selection, correction and keyboard behavior above that drawing.
@@ -1458,7 +1751,40 @@ const Field = styled.TextInput.attrs(({ theme }) => ({
   ${fieldText}
   min-height: 56px;
   padding: 0px;
+  padding-right: ${({ $inset }) => ($inset ? 48 : 0)}px;
   color: transparent;
+`;
+
+/* One quiet line between the field and the chips: what the text looks like,
+   and the way into the batch. No box — a fact, not a warning. */
+const DetectedBar = styled(Animated.View)`
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing.small}px;
+  min-height: 32px;
+  margin-top: ${({ theme }) => theme.spacing.small}px;
+`;
+
+const DetectedText = styled.Text`
+  flex-shrink: 1;
+  color: ${({ theme }) => theme.colors.mutedStrong};
+  font-size: ${({ theme }) => theme.type.caption + 1}px;
+  font-weight: 600;
+`;
+
+const DetectedAction = styled(PressableScale)`
+  min-height: 32px;
+  justify-content: center;
+  padding: 0px 12px;
+  border-radius: ${({ theme }) => theme.radii.pill}px;
+  border: 1px solid ${({ theme }) => theme.colors.text};
+`;
+
+const DetectedActionText = styled.Text.attrs(buttonTextAttrs)`
+  ${({ theme }) => buttonTextMetrics(theme.type.caption)}
+  color: ${({ theme }) => theme.colors.text};
+  font-weight: 800;
 `;
 
 const Chips = styled(Animated.View)`

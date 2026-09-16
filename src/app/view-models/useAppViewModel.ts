@@ -141,6 +141,8 @@ export function useAppViewModel(
     hasSeenOnboarding: preferences.hasSeenOnboarding,
     projectActivityNotifications: preferences.projectActivityNotifications,
     hasAskedActivityPermission: preferences.hasAskedActivityPermission,
+    voiceCaptureUsed: preferences.voiceCaptureUsed,
+    installReferrerRead: preferences.installReferrerRead,
     isRestored,
     changeAppearanceMode: useCallback(
       (mode: AppearanceMode) => update('appearanceMode', mode),
@@ -164,6 +166,14 @@ export function useAppViewModel(
     ),
     markActivityPermissionAsked: useCallback(
       () => update('hasAskedActivityPermission', true),
+      [update],
+    ),
+    markVoiceCaptureUsed: useCallback(
+      () => update('voiceCaptureUsed', true),
+      [update],
+    ),
+    markInstallReferrerRead: useCallback(
+      () => update('installReferrerRead', true),
       [update],
     ),
   };

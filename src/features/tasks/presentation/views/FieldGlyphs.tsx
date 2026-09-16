@@ -597,3 +597,25 @@ export function CheckGlyph({ color, size = 16 }: GlyphProps) {
     </Svg>
   );
 }
+
+/** A microphone: the other way into the capture sheet. */
+export function MicGlyph({ color, size = 13 }: GlyphProps) {
+  return (
+    <Svg height={size} viewBox="0 0 24 24" width={size}>
+      <Rect fill={color} height={13} rx={3.6} width={7.2} x={8.4} y={2} />
+      <Path
+        d="M5 11.2a7 7 0 0 0 14 0"
+        fill="none"
+        stroke={color}
+        strokeLinecap="round"
+        strokeWidth={2}
+      />
+      <Path
+        d="M12 18.2V22"
+        stroke={color}
+        strokeLinecap="round"
+        strokeWidth={2}
+      />
+    </Svg>
+  );
+}

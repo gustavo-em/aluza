@@ -56,6 +56,9 @@ jest.mock('react-native-reanimated', () => {
     SlideOutRight: makeAnimationBuilder(),
     LinearTransition: makeAnimationBuilder(),
     useAnimatedKeyboard: () => ({ height: { value: 0 } }),
+    // A frame callback never runs under the test renderer: what it writes is
+    // animation state, and every test reads the finished posture instead.
+    useFrameCallback: () => ({ setActive: () => undefined }),
   };
 
   function makeAnimationBuilder() {

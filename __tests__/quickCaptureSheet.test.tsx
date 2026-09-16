@@ -432,3 +432,77 @@ describe('the priority chip once it carries a choice', () => {
     }
   });
 });
+
+describe('who takes a task written inside a shared space', () => {
+  const members = [
+    {
+      personId: 'p-1',
+      name: 'Joana',
+      handle: null,
+      role: 'owner' as const,
+      joined: true,
+    },
+    {
+      personId: 'p-2',
+      name: 'Rafa',
+      handle: null,
+      role: 'editor' as const,
+      joined: true,
+    },
+  ];
+
+  it('opens with the writer on the task, and says so on the chip', () => {
+    const tree = renderSheet({
+      captureAssignment: { members, personId: 'p-1' },
+    });
+
+    expect(first(tree, 'capture-chip-assign').props.accessibilityLabel).toBe(
+      copy.capture.assignChipLabel(copy.lists.memberYou),
+    );
+  });
+
+  it('puts somebody else on it from the panel, and saves the people with the task', () => {
+    const submitted: { typed: string; overrides: unknown }[] = [];
+    const tree = renderSheet({
+      captureAssignment: { members, personId: 'p-1' },
+      onSubmit: (typed, overrides) => submitted.push({ typed, overrides }),
+    });
+
+    act(() => first(tree, 'capture-field').props.onChangeText('lavar a louça'));
+    act(() => first(tree, 'capture-chip-assign').props.onPress());
+
+    expect(has(tree, 'capture-assign-panel')).toBe(true);
+
+    act(() => first(tree, 'capture-assign-p-2').props.onPress());
+
+    expect(first(tree, 'capture-chip-assign').props.accessibilityLabel).toBe(
+      copy.capture.assignChipLabel(`${copy.lists.memberYou}, Rafa`),
+    );
+
+    act(() => first(tree, 'capture-save').props.onPress());
+
+    expect(submitted).toEqual([
+      {
+        typed: 'lavar a louça',
+        overrides: expect.objectContaining({ assignedIds: ['p-1', 'p-2'] }),
+      },
+    ]);
+  });
+
+  it('can be handed to nobody, and then says so', () => {
+    const tree = renderSheet({
+      captureAssignment: { members, personId: 'p-1' },
+    });
+
+    act(() => first(tree, 'capture-chip-assign').props.onPress());
+    act(() => first(tree, 'capture-assign-p-1').props.onPress());
+
+    expect(first(tree, 'capture-chip-assign').props.accessibilityLabel).toBe(
+      copy.capture.assignChipLabel(copy.capture.assignNobody),
+    );
+  });
+
+  it('offers no people outside a shared space', () => {
+    expect(has(renderSheet(), 'capture-chip-assign')).toBe(false);
+  });
+});

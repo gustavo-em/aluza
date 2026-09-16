@@ -53,6 +53,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O Aluza usa o microfone para transformar o que você fala em tarefas.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Para escolher a sua foto de perfil na galeria.</string>
 	<key>RCTNewArchEnabled</key>

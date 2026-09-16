@@ -27,6 +27,14 @@ export interface AppPreferences {
   /** True once the permission has been asked for — in a shared project or in
    * settings, never on a cold start. A refusal is not asked about again. */
   hasAskedActivityPermission: boolean;
+  /** True from the first recording that reached a preview. It is what
+   * retires the spoken example under the disc — once somebody has done it,
+   * showing them how is noise. */
+  voiceCaptureUsed: boolean;
+  /** True once Play's install referrer has been read. It is readable for the
+   * life of the install, so without this the same invite would reopen on
+   * every launch, forever. */
+  installReferrerRead: boolean;
 }
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = {
@@ -36,6 +44,8 @@ export const DEFAULT_APP_PREFERENCES: AppPreferences = {
   hasSeenOnboarding: false,
   projectActivityNotifications: true,
   hasAskedActivityPermission: false,
+  voiceCaptureUsed: false,
+  installReferrerRead: false,
 };
 
 function pick<T extends string>(
@@ -92,5 +102,13 @@ export function sanitizeAppPreferences(
       typeof values.hasAskedActivityPermission === 'boolean'
         ? values.hasAskedActivityPermission
         : defaults.hasAskedActivityPermission,
+    voiceCaptureUsed:
+      typeof values.voiceCaptureUsed === 'boolean'
+        ? values.voiceCaptureUsed
+        : defaults.voiceCaptureUsed,
+    installReferrerRead:
+      typeof values.installReferrerRead === 'boolean'
+        ? values.installReferrerRead
+        : defaults.installReferrerRead,
   };
 }

@@ -12,6 +12,8 @@ describe('app preferences', () => {
       hasSeenOnboarding: true,
       projectActivityNotifications: false,
       hasAskedActivityPermission: true,
+      voiceCaptureUsed: true,
+      installReferrerRead: true,
     };
 
     expect(sanitizeAppPreferences(stored)).toEqual(stored);
@@ -23,6 +25,14 @@ describe('app preferences', () => {
       sanitizeAppPreferences({ appearanceMode: 'dark' })
         .projectActivityNotifications,
     ).toBe(true);
+  });
+
+  it('starts everybody at no recordings made and no referrer read', () => {
+    expect(DEFAULT_APP_PREFERENCES.voiceCaptureUsed).toBe(false);
+    expect(DEFAULT_APP_PREFERENCES.installReferrerRead).toBe(false);
+    expect(
+      sanitizeAppPreferences({ voiceCaptureUsed: 1 }).voiceCaptureUsed,
+    ).toBe(false);
   });
 
   it('falls back for anything it does not recognise', () => {

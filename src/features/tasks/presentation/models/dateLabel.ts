@@ -100,3 +100,28 @@ export function formatDateLabel(
     ? `${month} ${date.getDate()}${year}`
     : `${date.getDate()}${names.joiner}${month}${year}`;
 }
+
+/**
+ * A day small enough for a chip: "sex, 18 set" / "Fri, Sep 18".
+ *
+ * The weekday earns its place here — a preview chip is read beside two other
+ * chips, and "18 de setembro" alone does not answer the question somebody
+ * actually has, which is whether that is the Friday they meant. The names are
+ * the full ones cut to three letters, which is how both languages abbreviate
+ * them anyway.
+ */
+export function formatShortDayLabel(
+  atMs: number,
+  language: AppLanguage,
+): string {
+  const names = CALENDAR_NAMES[language] ?? CALENDAR_NAMES['pt-BR'];
+  const date = new Date(atMs);
+  const weekday = names.weekdays[date.getDay()].slice(0, 3).toLowerCase();
+  const month = names.months[date.getMonth()].slice(0, 3);
+
+  return language === 'en-US'
+    ? `${weekday[0].toUpperCase()}${weekday.slice(
+        1,
+      )}, ${month[0].toUpperCase()}${month.slice(1)} ${date.getDate()}`
+    : `${weekday}, ${date.getDate()} ${month}`;
+}
