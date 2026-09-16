@@ -278,9 +278,15 @@ export function acceptInvite(
     id: localId,
     groups: incoming.list.groups ?? [],
   };
+  // The tasks keep the ids the project gave them. They used to be suffixed
+  // like the list, and the first push from the joiner's phone then wrote the
+  // suffixed ids back onto the project: the owner's day, trio and assignment
+  // map — all keyed by the original ids — stopped matching anything, and the
+  // band lost the owner's line on the very phone that had just joined. A task
+  // id is minted unique, so there is no collision to avoid; only the list id
+  // is derived from a name.
   const tasks: Task[] = incoming.tasks.map(task => ({
     ...task,
-    id: `${task.id}@${token.slice(0, 4)}`,
     listId: localId,
   }));
   const next: Workspace = {

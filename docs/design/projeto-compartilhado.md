@@ -242,10 +242,15 @@ Um espaço que já perdeu `groups` no servidor se conserta sozinho: basta quem
 tem os grupos no aparelho abrir o app e mexer no espaço; o push seguinte
 reescreve o campo e a outra pessoa recebe tudo no pull. Não há migração.
 
-Ponto frágil vizinho, registrado de propósito: `acceptInvite` sufixa `task.id`
-com `@<token4>` para não colidir com o que já existe no aparelho, e **não**
-sufixa `groupId`. Funciona porque `sanitizeGroups` preserva o id do grupo como
-veio do servidor; quem mexer em um dos dois tem que olhar o outro.
+Ponto frágil vizinho, corrigido em 2026-09-15: `acceptInvite` sufixava
+`task.id` com `@<token4>` (o id da lista continua sufixado, porque deriva do
+nome e colide). O primeiro push do aparelho que entrou gravava esses ids no
+servidor, e o trio, o dia e o mapa `assignments` do dono — todos chaveados
+pelos ids originais — deixavam de casar: as fichas sumiam e a linha do dono
+saía da faixa. Hoje a tarefa mantém o id do projeto (`createId` já é único), e
+o push de qualquer aparelho remove o sufixo de uma cópia antiga
+(`remoteTaskId`), o que conserta o documento no servidor na próxima escrita.
+`groupId` nunca foi sufixado; `sanitizeGroups` preserva o id como veio.
 
 ## Decisão de 2026-09-10 — quem põe alguém numa tarefa
 

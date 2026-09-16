@@ -47,6 +47,9 @@ interface SharedDayBandProps {
   /** How much this band can vouch for what is on screen: read, unreachable,
    * or refused. `error` never borrows the words of a missing network. */
   status: SharedDayStatus;
+  /** Who is reading the band, so a task they closed themselves says "Você"
+   * instead of their own name back at them. */
+  personId?: string | null;
   /** Absent when there is nothing for this person to take, or when they only
    * have reading rights. */
   onTakeOne?: () => void;
@@ -75,7 +78,7 @@ function clockOf(atMs: number, language: AppLanguage): string {
 }
 
 /**
- * The card at the top of an open shared project: "Hoje, no combinado".
+ * The card at the top of an open shared project: "O dia de vocês".
  *
  * It answers one question — what did each of us take for today, and did we
  * close it. Never who is ahead: no weight, no points, no level, no personal
@@ -92,6 +95,7 @@ export function SharedDayBand({
   allDone,
   streakDays,
   status,
+  personId = null,
   onTakeOne,
   onRetry,
 }: SharedDayBandProps) {
@@ -167,13 +171,44 @@ export function SharedDayBand({
    * name is the whole line. */
   function personDetail(entry: SharedDayEntry): string | null {
     if (entry.state === 'done' && entry.task?.completedAtMs != null) {
-      return copy.lists.dayBandClosedAt(
-        clockOf(entry.task.completedAtMs, language),
-      );
+      return closedLine(entry, entry.task.completedAtMs);
     }
     if (entry.state === 'focusing') return copy.lists.dayBandStateFocusing;
 
     return null;
+  }
+
+  /**
+   * Who closed it, and when.
+   *
+   * The row belongs to whoever took the task for today, and anybody in the
+   * space may tick it — so the line under their name has to say which of
+   * those two things happened. It used to say "fechou às 9:12" either way,
+   * crediting the person who took it with work somebody else did.
+   */
+  function closedLine(entry: SharedDayEntry, atMs: number): string {
+    const time = clockOf(atMs, language);
+    const by = entry.task?.completedBy ?? null;
+    const closer = closerOf(entry);
+
+    if (closer != null) return copy.lists.dayBandClosedBy(closer, time);
+    // Their own task, closed by them: the name above the line already says
+    // who. Closed before the project was shared: nobody to name at all.
+    if (by === entry.member.personId) return copy.lists.dayBandClosedAt(time);
+
+    return copy.lists.dayBandClosedNeutral(time);
+  }
+
+  /** The name of whoever closed this row's task, when that is not the person
+   * whose row it is. Null when it is their own, or unknown. */
+  function closerOf(entry: SharedDayEntry): string | null {
+    const by = entry.task?.completedBy ?? null;
+    if (by == null || by === entry.member.personId) return null;
+    if (by === personId) return copy.lists.memberYou;
+
+    return (
+      entries.find(other => other.member.personId === by)?.member.name ?? null
+    );
   }
 
   /** Name, task, state — the box on the left is decoration for the eye, so
@@ -182,6 +217,12 @@ export function SharedDayBand({
     const state =
       entry.state === 'focusing'
         ? copy.lists.dayBandStateFocusing
+        : entry.state === 'done' &&
+          entry.task?.completedAtMs != null &&
+          closerOf(entry) != null
+        ? // Only the news earns a longer sentence: somebody else closed it.
+          // A person closing their own task is already "concluída".
+          closedLine(entry, entry.task.completedAtMs)
         : entry.state === 'done'
         ? copy.lists.dayBandStateDone
         : entry.state === 'open'

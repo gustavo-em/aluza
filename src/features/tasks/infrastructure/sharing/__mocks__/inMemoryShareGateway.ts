@@ -1,7 +1,11 @@
 import type { ShareGateway } from '../../../application/ports/ShareGateway';
 import { ShareOperationError } from '../../../domain/ShareError';
 import type { SharedMemberDay } from '../../../domain/SharedMemberDay';
-import type { ListShare, TaskList } from '../../../domain/TaskList';
+import {
+  remoteTaskId,
+  type ListShare,
+  type TaskList,
+} from '../../../domain/TaskList';
 import type { Task } from '../../../domain/Task';
 import {
   withAssignments,
@@ -112,7 +116,14 @@ export function createInMemoryShareGateway(): ShareGateway {
       // push that deleted `groups` on the server looked perfect in tests.
       const stored = applyUpdateMask(
         project.list as unknown as Record<string, unknown>,
-        sharePushBody(list, [...tasks], Date.now()),
+        sharePushBody(
+          list,
+          tasks.map(task => ({
+            ...task,
+            id: remoteTaskId(task.id, share.token),
+          })),
+          Date.now(),
+        ),
         SHARE_PUSH_MASK,
       );
 

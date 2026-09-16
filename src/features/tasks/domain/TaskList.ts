@@ -77,6 +77,24 @@ export interface TaskList {
  */
 export const SHARE_LINK_ORIGIN = 'https://ideiasorganizetask.web.app';
 export const SHARE_LINK_PATH = '/e/';
+/**
+ * The id a task has on the project.
+ *
+ * Versions up to 1.4 suffixed every task that arrived through an invite with
+ * `@` and the first four characters of the token, and pushed it back that
+ * way. Nothing else ever wrote that shape, so a push strips it: the project
+ * goes back to the ids the owner's day and assignment map are keyed by, and
+ * the next pull brings every phone in line. A task made after the fix is
+ * returned as it is.
+ */
+export function remoteTaskId(id: string, token: string): string {
+  const suffix = `@${token.slice(0, 4)}`;
+
+  return id.length > suffix.length && id.endsWith(suffix)
+    ? id.slice(0, -suffix.length)
+    : id;
+}
+
 export function buildInviteLink(token: string): string {
   return `${SHARE_LINK_ORIGIN}${SHARE_LINK_PATH}${token}`;
 }

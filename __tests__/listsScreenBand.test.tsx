@@ -38,6 +38,33 @@ jest.mock('../src/features/tasks/presentation/views/ShareSheet', () => {
 jest.mock('../src/features/tasks/presentation/views/JoinInviteSheet', () => ({
   JoinInviteSheet: () => null,
 }));
+// The picker the band opens: one pressable per task it was handed, so the
+// test can choose without dragging the modal in.
+jest.mock('../src/features/tasks/presentation/views/TakeOneSheet', () => {
+  const { Pressable, View } = require('react-native');
+  const { createElement } = require('react');
+
+  return {
+    TakeOneSheet: ({
+      tasks,
+      onPick,
+    }: {
+      tasks: readonly { id: string }[];
+      onPick: (taskId: string) => void;
+    }) =>
+      createElement(
+        View,
+        { testID: 'mock-take-one' },
+        ...tasks.map(task =>
+          createElement(Pressable, {
+            key: task.id,
+            onPress: () => onPick(task.id),
+            testID: `mock-take-one-${task.id}`,
+          }),
+        ),
+      ),
+  };
+});
 jest.mock('../src/features/tasks/presentation/views/QuickCaptureSheet', () => ({
   QuickCaptureSheet: () => null,
 }));
@@ -277,6 +304,43 @@ describe('the band inside the lists screen', () => {
     expect(rendered).toContain(copy.lists.dayBandTitle);
     expect(rendered).not.toContain(copy.lists.dayBandError);
     expect(rendered).not.toContain(copy.lists.dayBandOffline);
+  });
+
+  it('offers the space’s open work for today, and takes the chosen one into the day', () => {
+    const moveIntoDay = jest.fn();
+    // Nobody published a day yet, so this person has not taken anything —
+    // and the space holds one open task outside the day.
+    const root = render(sharedList, {
+      sharedDays: {},
+      moveIntoDay,
+    } as unknown as Partial<TasksViewModel>);
+
+    open(root, sharedList);
+    press(root, 'shared-day-take-one');
+
+    expect(
+      root.findAll(node => node.props.testID === 'mock-take-one-t-1').length,
+    ).toBeGreaterThan(0);
+
+    press(root, 'mock-take-one-t-1');
+
+    expect(moveIntoDay).toHaveBeenCalledWith('t-1');
+    expect(
+      root.findAll(node => node.props.testID === 'mock-take-one'),
+    ).toHaveLength(0);
+  });
+
+  it('hides the offer when the day already holds everything the space has open', () => {
+    const root = render(sharedList, {
+      sharedDays: {},
+      dayTaskIds: ['t-1'],
+    } as unknown as Partial<TasksViewModel>);
+
+    open(root, sharedList);
+
+    expect(
+      root.findAll(node => node.props.testID === 'shared-day-take-one'),
+    ).toHaveLength(0);
   });
 
   it('opens a project of your own with no band and nothing in its place', () => {

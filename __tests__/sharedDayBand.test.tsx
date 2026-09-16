@@ -51,8 +51,17 @@ function entry(
   };
 }
 
+/** The same row, but closed by somebody other than whoever took it. */
+function closedBy(base: SharedDayEntry, personId: string): SharedDayEntry {
+  return {
+    ...base,
+    task: base.task == null ? null : { ...base.task, completedBy: personId },
+  };
+}
+
 interface BandOptions {
   entries?: readonly SharedDayEntry[];
+  personId?: string | null;
   allDone?: boolean;
   streakDays?: number;
   status?: SharedDayStatus;
@@ -62,6 +71,7 @@ interface BandOptions {
 
 function render({
   entries = [],
+  personId = null,
   allDone = false,
   streakDays = 0,
   status = 'ok',
@@ -75,6 +85,7 @@ function render({
       <ThemeProvider theme={lightTheme}>
         <SharedDayBand
           allDone={allDone}
+          personId={personId}
           copy={copy}
           entries={entries}
           onRetry={onRetry}
@@ -132,6 +143,38 @@ const ALL_FOUR: readonly SharedDayEntry[] = [
 ];
 
 describe('SharedDayBand', () => {
+  it('names whoever closed the task, when it was not whose day it was', () => {
+    const joana = ALL_FOUR[2];
+    const rendered = texts(
+      render({
+        entries: [...ALL_FOUR.slice(0, 2), closedBy(joana, 'p-2'), ALL_FOUR[3]],
+      }),
+    );
+
+    // Joana took it; Rafa ticked it. The band used to credit Joana with it.
+    expect(rendered.some(line => line.includes('Rafa fechou às'))).toBe(true);
+  });
+
+  it('says "Você" when the reader is the one who closed somebody else’s task', () => {
+    const joana = ALL_FOUR[2];
+    const rendered = texts(
+      render({
+        entries: [closedBy(joana, 'p-9')],
+        personId: 'p-9',
+      }),
+    );
+
+    expect(
+      rendered.some(line => line.includes(`${copy.lists.memberYou} fechou às`)),
+    ).toBe(true);
+  });
+
+  it('keeps the short line for a task somebody closed themselves', () => {
+    const rendered = texts(render({ entries: [closedBy(ALL_FOUR[2], 'p-1')] }));
+
+    expect(rendered.some(line => line.includes('fechou às'))).toBe(true);
+  });
+
   // The retry keeps its busy label for a floor of 600ms, so the clock is
   // this test's to move.
   beforeEach(() => {

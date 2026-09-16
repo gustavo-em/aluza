@@ -15,6 +15,7 @@ import {
   listColors,
   listRoles,
   projectIcons,
+  remoteTaskId,
   sanitizeJoinedAtMs,
   type ListColor,
   type ListMember,
@@ -468,7 +469,13 @@ export const firestoreShareGateway: ShareGateway = {
       // left out of the body is erased on the server, which is how the
       // groups of a shared space used to disappear on every push.
       updateMask: SHARE_PUSH_MASK,
-      fields: sharePushBody(list, tasks.map(taskToRecord), Date.now()),
+      fields: sharePushBody(
+        list,
+        tasks.map(task =>
+          taskToRecord({ ...task, id: remoteTaskId(task.id, share.token) }),
+        ),
+        Date.now(),
+      ),
     });
   },
 

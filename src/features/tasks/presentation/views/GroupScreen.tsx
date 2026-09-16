@@ -25,7 +25,7 @@ import { MemberStack } from './MemberStack';
 import { PressableScale } from './PressableScale';
 import { SectionHeader } from './SectionHeader';
 import { ProjectEmptyState } from './ProjectEmptyState';
-import { TaskRow } from './TaskRow';
+import { ProjectTaskRow } from './ProjectTaskRow';
 
 interface GroupScreenProps {
   copy: TaskCopy;
@@ -206,21 +206,21 @@ export function GroupScreen({
               title={section.title}
             />
             {section.tasks.map((task, index) => (
-              <TaskRow
+              /* The very row the space draws, fichas and all: a task taken
+                 by somebody keeps their face one tap deeper, inside the
+                 group, instead of losing it at the door. Inside the group the
+                 heading already says how close the event is, so the plain
+                 row spends its one slot on the deadline. */
+              <ProjectTaskRow
                 copy={copy}
                 index={index}
+                isViewer={isViewer}
                 key={task.id}
                 language={language}
-                /* Inside the group the heading already says how close the
-                   event is, so the row spends its one slot on the deadline
-                   rather than repeating the section. */
-                lens="list"
-                listColor={null}
-                listIcon={null}
-                listName={null}
+                list={list}
                 nowMs={nowMs}
-                onEdit={isViewer ? undefined : () => handleEdit(task)}
-                onToggle={isViewer ? noop : () => onToggleTask(task.id)}
+                onEditTask={handleEdit}
+                onToggleTask={onToggleTask}
                 sectionId={`group-${section.id}`}
                 task={task}
               />
