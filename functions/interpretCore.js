@@ -278,7 +278,39 @@ function sanitizeLines(answer) {
     .slice(0, MAX_LINES);
 }
 
+/**
+ * How sure the transcriber has to be that a stretch of the recording is not
+ * speech before its words are thrown away. A transcriber handed room tone
+ * does not answer with silence — it answers with a sentence from its
+ * training, confidently, and the reader downstream turns that into a task
+ * nobody asked for ("Buy bread", from thirty seconds of an empty room). It
+ * says so in the same breath, though, and these are the two numbers where it
+ * says it.
+ */
+const NO_SPEECH_MAX = 0.6;
+const LOGPROB_MIN = -1;
+
+/** The words the transcriber was actually confident it heard. */
+function spokenText(payload) {
+  const segments = Array.isArray(payload?.segments) ? payload.segments : null;
+
+  // An answer with no segments at all is the older shape, and is taken at
+  // its word: there is nothing here to judge it by.
+  if (segments == null)
+    return typeof payload?.text === 'string' ? payload.text : '';
+
+  return segments
+    .filter(
+      segment =>
+        Number(segment?.no_speech_prob ?? 0) <= NO_SPEECH_MAX &&
+        Number(segment?.avg_logprob ?? 0) >= LOGPROB_MIN,
+    )
+    .map(segment => String(segment?.text ?? ''))
+    .join(' ');
+}
+
 module.exports = {
+  spokenText,
   resolveDue,
   taskSystemPrompt,
   taskMessagesFor,

@@ -7,6 +7,7 @@ import Sound, {
   type RecordBackType,
 } from 'react-native-nitro-sound';
 
+import { createLoudness } from './loudness';
 import {
   MicrophoneDeniedError,
   type MicPermission,
@@ -33,15 +34,6 @@ import {
  * rather than step. */
 const METERING_SECONDS = 0.03;
 
-/**
- * The range a phone microphone actually uses, measured on a Galaxy M53: a
- * quiet room reads about -63 dB and ordinary speech peaks around -39, never
- * anywhere near the 0 dB top of the scale. Mapped against that 0, every bar
- * of the trail came out at its minimum height and the waveform looked dead.
- */
-const QUIET_DB = -60;
-const LOUD_DB = -25;
-
 const AUDIO = {
   // iOS
   AVFormatIDKeyIOS: 'aac',
@@ -59,14 +51,8 @@ const AUDIO = {
   AudioEncodingBitRate: 64000,
 } as const;
 
-/** Decibels as the 0–1 the rings and the trace are drawn from. */
-function loudness(metering: number | undefined): number {
-  if (metering == null || Number.isNaN(metering)) return 0;
-
-  return Math.max(0, Math.min(1, (metering - QUIET_DB) / (LOUD_DB - QUIET_DB)));
-}
-
 let position = 0;
+let loudness = createLoudness();
 
 export const nitroVoiceRecorder: VoiceRecorder = {
   available: true,
@@ -90,6 +76,9 @@ export const nitroVoiceRecorder: VoiceRecorder = {
 
   async start(onLevel) {
     position = 0;
+    // A new room every time: the last recording's floor says nothing about
+    // where this one is being made.
+    loudness = createLoudness();
     Sound.setSubscriptionDuration(METERING_SECONDS);
     Sound.addRecordBackListener((meta: RecordBackType) => {
       position = meta.currentPosition;

@@ -152,6 +152,9 @@ export function VoiceSheet({
   const startedAt = useSharedValue(0);
   const spokenMs = useRef(0);
   const quietMs = useRef(0);
+  /** Whether this recorder measures loudness at all. One that does not says
+   * nothing about whether anybody spoke, and nothing is all it is read as. */
+  const metered = useRef(false);
   const audio = useRef<RecordedAudio | null>(null);
   const stopping = useRef(false);
 
@@ -252,6 +255,21 @@ export function VoiceSheet({
 
       try {
         const recorded = await recorder.stop();
+
+        // Nothing was said, so there is nothing to read. Sending it anyway is
+        // not merely wasteful: a transcriber handed a minute of room tone
+        // answers with a sentence it has heard before, and the sheet offered
+        // to create "Buy bread" to somebody who never opened their mouth.
+        if (metered.current && spokenMs.current < VOICE_LIMITS.minSpeechMs) {
+          audio.current = null;
+          await recorder.discard(recorded.audioId);
+          // The same landing an empty answer from the server gets: nothing
+          // heard, nothing kept, and no offer to send the silence again.
+          dispatch({ t: 'stop', reason, audioId: recorded.audioId });
+          dispatch({ t: 'result', tasks: [], projectId: spaceId });
+          return;
+        }
+
         audio.current = recorded;
         dispatch({ t: 'stop', reason, audioId: recorded.audioId });
         await interpret(recorded);
@@ -263,7 +281,7 @@ export function VoiceSheet({
         stopping.current = false;
       }
     },
-    [interpret, recorder],
+    [interpret, recorder, spaceId],
   );
 
   // Silence and the minute cap, checked on a slow interval rather than every
@@ -344,11 +362,13 @@ export function VoiceSheet({
 
     spokenMs.current = 0;
     quietMs.current = 0;
+    metered.current = false;
     startedAt.value = Date.now();
     setElapsedMs(0);
 
     try {
       await recorder.start(value => {
+        metered.current = true;
         level.value = value;
         if (value >= VOICE_LIMITS.silenceLevel) {
           spokenMs.current += 33;

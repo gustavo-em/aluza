@@ -26,6 +26,7 @@ const {
   normalizeText,
   providerFor,
   sanitizeTasks,
+  spokenText,
   taskRequestFor,
   transcriptionLanguage,
 } = require('./interpretCore');
@@ -48,8 +49,9 @@ async function transcribe(key, audio, mime, language) {
   form.append('file', new Blob([audio], { type: mime }), 'note.m4a');
   form.append('model', TRANSCRIBE_MODEL);
   form.append('language', transcriptionLanguage(language));
-  // The plain text, not the JSON envelope: there is nothing else to read.
-  form.append('response_format', 'text');
+  // The envelope, not the plain text: the per-stretch confidence is the only
+  // thing that separates a quiet room from a sentence.
+  form.append('response_format', 'verbose_json');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRANSCRIBE_TIMEOUT_MS);
@@ -77,7 +79,7 @@ async function transcribe(key, audio, mime, language) {
       return null;
     }
 
-    return await upstream.text();
+    return spokenText(await upstream.json());
   } finally {
     clearTimeout(timer);
   }

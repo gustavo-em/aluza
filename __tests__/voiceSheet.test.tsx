@@ -20,14 +20,22 @@ const AUDIO: RecordedAudio = {
   durationMs: 4000,
 };
 
-function recorderThat(permission: MicPermission = 'granted'): VoiceRecorder {
+function recorderThat(
+  permission: MicPermission = 'granted',
+  /** What the microphone reports, frame after frame. A recorder that reports
+   * nothing is one without metering, and the sheet reads no verdict from it. */
+  level: number | null = null,
+): VoiceRecorder {
   return {
     available: true,
     async requestPermission() {
       return permission;
     },
-    async start() {
-      // Nothing to do: the sheet drives the level itself in these tests.
+    async start(onLevel) {
+      if (level == null) return;
+      // Enough frames to cover the second of speech the sheet asks for
+      // before it will send anything.
+      for (let frame = 0; frame < 120; frame += 1) onLevel(level);
     },
     async stop() {
       return AUDIO;
@@ -249,6 +257,46 @@ describe('the sheet that listens', () => {
     });
 
     expect(calls).toBe(2);
+  });
+
+  it('does not send a recording nobody spoke into', async () => {
+    // Thirty seconds of an empty room used to go to the transcriber, which
+    // answered with a sentence out of its training — the sheet offered to
+    // create "buy bread" to somebody who had said nothing at all.
+    let calls = 0;
+    const root = await listening({
+      capture: {
+        async interpret() {
+          calls += 1;
+          return [{ title: 'comprar pão', dueAt: null }];
+        },
+      },
+      recorder: recorderThat('granted', 0),
+    });
+
+    await stopAndSettle(root);
+
+    expect(calls).toBe(0);
+    expect(texts(root)).toContain(words.empty);
+    expect(has(root, 'voice-card-0')).toBe(false);
+  });
+
+  it('sends one that somebody did speak into', async () => {
+    let calls = 0;
+    const root = await listening({
+      capture: {
+        async interpret() {
+          calls += 1;
+          return [{ title: 'comprar pão', dueAt: null }];
+        },
+      },
+      recorder: recorderThat('granted', 1),
+    });
+
+    await stopAndSettle(root);
+
+    expect(calls).toBe(1);
+    expect(texts(root)).toContain('comprar pão');
   });
 
   it('sets a deadline the note never gave, from the card', async () => {

@@ -36,12 +36,18 @@ const DIAMETER: Record<VoiceDiscSize, number> = {
   inline: 44,
 };
 
-/** The box the disc lives in, which never changes with the disc. */
-const BOX = 88;
-const INLINE_BOX = 44;
-/** The two rings that breathe with a voice. */
+/** The two rings that breathe with a voice. The outer one is what the box
+ * around the disc is sized from. */
 const RING_INNER = 112;
 const RING_OUTER = 140;
+
+/** The box the disc lives in, which never changes with the disc. It is as
+ * wide as the outer ring rather than as wide as the disc: the rings are
+ * absolute, so a box cut to the disc let them breathe straight over the line
+ * of text underneath — which is what they did on the iPhone, where a louder
+ * scale kept them at full size. */
+const BOX = RING_OUTER;
+const INLINE_BOX = 44;
 /** The countdown ring: drawn between the disc and the inner ring. */
 const TIME_SIZE = RING_INNER;
 const TIME_RADIUS = 50;

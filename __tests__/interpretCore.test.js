@@ -13,6 +13,56 @@ const {
   sanitizeLines,
 } = require('../functions/interpretCore');
 
+describe('what the transcriber was sure it heard', () => {
+  const { spokenText } = require('../functions/interpretCore');
+
+  it('throws away a stretch it says is not speech', () => {
+    // Thirty seconds of an empty room came back as a confident sentence out
+    // of the model's training, which the reader then turned into a task.
+    // The same answer carries the doubt, in these two numbers.
+    expect(
+      spokenText({
+        text: 'Buy bread',
+        segments: [
+          { text: ' Buy bread', no_speech_prob: 0.93, avg_logprob: -0.4 },
+        ],
+      }),
+    ).toBe('');
+  });
+
+  it('keeps the words it was confident about, and drops the rest', () => {
+    expect(
+      spokenText({
+        segments: [
+          { text: ' obrigado', no_speech_prob: 0.82, avg_logprob: -0.2 },
+          {
+            text: ' comprar pão amanhã',
+            no_speech_prob: 0.04,
+            avg_logprob: -0.3,
+          },
+        ],
+      }),
+    ).toBe(' comprar pão amanhã');
+  });
+
+  it('drops a stretch it could barely make out', () => {
+    expect(
+      spokenText({
+        segments: [
+          { text: ' aaa aaa', no_speech_prob: 0.1, avg_logprob: -1.9 },
+        ],
+      }),
+    ).toBe('');
+  });
+
+  it('takes an answer without stretches at its word', () => {
+    // An older shape, or a model that does not break the answer up: there is
+    // nothing there to judge it by.
+    expect(spokenText({ text: 'pagar a luz' })).toBe('pagar a luz');
+    expect(spokenText({})).toBe('');
+  });
+});
+
 describe('which reader is configured', () => {
   it('reads the provider off the shape of the one key', () => {
     expect(providerFor('sk-proj-abcdefghijklmnopqrstuvwxyz')).toBe('openai');
