@@ -61,7 +61,7 @@
 
     <section id="pt-br" lang="pt-BR">
       <h1>Política de Privacidade do Aluza</h1>
-      <p class="updated">Última atualização: 04 de setembro de 2026</p>
+      <p class="updated">Última atualização: 16 de setembro de 2026</p>
 
       <p>
         Este documento explica quais dados o aplicativo
@@ -114,7 +114,39 @@
         não são enviados a terceiros.
       </p>
 
-      <h2>5. Análise de uso e relatórios de falha</h2>
+      <h2>5. Captura por voz (áudio)</h2>
+      <p>
+        O Aluza permite ditar tarefas: você toca no microfone, fala, e a
+        gravação é transformada em tarefas. O microfone só é ligado enquanto
+        você grava — a gravação dura no máximo 60 segundos e para sozinha depois
+        de alguns segundos de silêncio. Usar a voz é opcional; digitar faz
+        exatamente a mesma coisa.
+      </p>
+      <p>
+        Para transformar a fala em texto, o áudio sai do seu aparelho: ele é
+        enviado por conexão criptografada ao nosso servidor (Firebase Cloud
+        Functions) e repassado à <strong>OpenAI</strong>, que faz a transcrição
+        e a separação em tarefas. Nós <strong>não guardamos o áudio</strong>: o
+        servidor o mantém apenas em memória durante o pedido e o descarta ao
+        responder. No seu aparelho, a última gravação fica até 5 minutos, para o
+        caso de a leitura falhar e você querer tentar de novo sem falar tudo
+        outra vez.
+      </p>
+      <p>
+        O que é salvo na sua conta é apenas o texto das tarefas que você
+        confirmar na prévia — nada é criado antes disso. A OpenAI pode reter o
+        conteúdo enviado por um período limitado para monitoramento de abuso,
+        conforme a
+        <a
+          href="https://openai.com/policies/privacy-policy"
+          target="_blank"
+          rel="noopener"
+          >Política de Privacidade da OpenAI</a
+        >; pelas condições da API, esse conteúdo não é usado para treinar os
+        modelos deles.
+      </p>
+
+      <h2>6. Análise de uso e relatórios de falha</h2>
       <p>
         O Aluza usa <strong>Firebase Analytics</strong> e
         <strong>Firebase Crashlytics</strong>, ambos do Google.
@@ -147,7 +179,7 @@
         rastreamento entre aplicativos ou sites de terceiros.
       </p>
 
-      <h2>6. O que NÃO coletamos</h2>
+      <h2>7. O que NÃO coletamos</h2>
       <ul>
         <li>Não exibimos anúncios nem usamos redes de publicidade</li>
         <li>
@@ -164,7 +196,7 @@
         </li>
       </ul>
 
-      <h2>7. Permissões solicitadas no Android</h2>
+      <h2>8. Permissões solicitadas no Android</h2>
       <ul>
         <li>
           <code>INTERNET</code> — necessária para sincronizar suas listas e
@@ -182,14 +214,19 @@
           manter lembretes e notificações agendadas funcionando após reiniciar o
           aparelho
         </li>
+        <li>
+          <code>RECORD_AUDIO</code> — para a captura por voz, pedida na primeira
+          vez que você toca no microfone e usada apenas enquanto você grava
+          (seção 5)
+        </li>
       </ul>
       <p>
-        O Aluza não solicita acesso a câmera, localização, contatos, microfone
-        ou armazenamento de arquivos. A galeria de fotos é aberta apenas quando
+        O Aluza não solicita acesso a câmera, localização, contatos ou
+        armazenamento de arquivos. A galeria de fotos é aberta apenas quando
         você escolhe uma foto de perfil, e apenas a imagem escolhida é lida.
       </p>
 
-      <h2>8. Retenção e exclusão de dados</h2>
+      <h2>9. Retenção e exclusão de dados</h2>
       <p>
         Seus dados de conta e conteúdo ficam armazenados enquanto sua conta
         existir. Você pode excluir a conta dentro do próprio aplicativo, em
@@ -205,13 +242,20 @@
         >, atendida em até 30 dias.
       </p>
 
-      <h2>9. Serviços de terceiros utilizados</h2>
+      <h2>10. Serviços de terceiros utilizados</h2>
       <p>
         O Aluza utiliza os seguintes serviços do Google Firebase: Firebase
         Authentication (login), Cloud Firestore (armazenamento de dados),
         Firebase Cloud Messaging (notificações), Firebase Analytics (análise de
-        uso) e Firebase Crashlytics (relatórios de falha). O uso desses serviços
-        está sujeito também à
+        uso) e Firebase Crashlytics (relatórios de falha). Na captura por voz, o
+        áudio é enviado à <strong>OpenAI</strong> para transcrição e leitura
+        (seção 5), sujeita à
+        <a
+          href="https://openai.com/policies/privacy-policy"
+          target="_blank"
+          rel="noopener"
+          >Política de Privacidade da OpenAI</a
+        >. O uso dos serviços do Google está sujeito também à
         <a
           href="https://policies.google.com/privacy"
           target="_blank"
@@ -220,7 +264,7 @@
         >.
       </p>
 
-      <h2>10. Contato</h2>
+      <h2>11. Contato</h2>
       <p>
         Dúvidas sobre esta política ou sobre seus dados, incluindo pedidos de
         exclusão de conta, podem ser enviadas para:
@@ -241,7 +285,7 @@
 
     <section id="en" lang="en">
       <h1>Aluza Privacy Policy</h1>
-      <p class="updated">Last updated: September 4, 2026</p>
+      <p class="updated">Last updated: September 16, 2026</p>
 
       <p>
         This document explains what data the <strong>Aluza</strong> app
@@ -289,7 +333,36 @@
         third party.
       </p>
 
-      <h2>5. Usage analytics and crash reports</h2>
+      <h2>5. Voice capture (audio)</h2>
+      <p>
+        Aluza lets you dictate tasks: you tap the microphone, speak, and the
+        recording becomes tasks. The microphone is only on while you are
+        recording — a recording lasts at most 60 seconds and stops on its own
+        after a few seconds of silence. Using your voice is optional; typing
+        does exactly the same thing.
+      </p>
+      <p>
+        To turn speech into text, the audio leaves your device: it is sent over
+        an encrypted connection to our server (Firebase Cloud Functions) and
+        passed on to <strong>OpenAI</strong>, which transcribes it and splits it
+        into tasks. We <strong>do not store the audio</strong>: the server keeps
+        it in memory for the request only and discards it when it answers. On
+        your device, the last recording is kept for up to 5 minutes, in case the
+        reading fails and you would rather retry than say it all again.
+      </p>
+      <p>
+        What is saved to your account is only the text of the tasks you confirm
+        in the preview — nothing is created before that. OpenAI may retain the
+        content sent for a limited period for abuse monitoring, under the
+        <a
+          href="https://openai.com/policies/privacy-policy"
+          target="_blank"
+          rel="noopener"
+          >OpenAI Privacy Policy</a
+        >; under the API terms, that content is not used to train their models.
+      </p>
+
+      <h2>6. Usage analytics and crash reports</h2>
       <p>
         Aluza uses <strong>Firebase Analytics</strong> and
         <strong>Firebase Crashlytics</strong>, both from Google.
@@ -321,7 +394,7 @@
         across other companies' apps or websites.
       </p>
 
-      <h2>6. What we do NOT collect</h2>
+      <h2>7. What we do NOT collect</h2>
       <ul>
         <li>We do not show ads or use advertising networks</li>
         <li>
@@ -338,7 +411,7 @@
         </li>
       </ul>
 
-      <h2>7. Android permissions requested</h2>
+      <h2>8. Android permissions requested</h2>
       <ul>
         <li><code>INTERNET</code> — required to sync your lists and tasks</li>
         <li><code>POST_NOTIFICATIONS</code> — to show app notifications</li>
@@ -351,14 +424,19 @@
           keep scheduled reminders and notifications working after the device
           restarts
         </li>
+        <li>
+          <code>RECORD_AUDIO</code> — for voice capture, asked for the first
+          time you tap the microphone and used only while you are recording
+          (section 5)
+        </li>
       </ul>
       <p>
-        Aluza does not request access to camera, location, contacts, microphone,
-        or file storage. The photo gallery is opened only when you pick a
-        profile picture, and only the image you choose is read.
+        Aluza does not request access to camera, location, contacts, or file
+        storage. The photo gallery is opened only when you pick a profile
+        picture, and only the image you choose is read.
       </p>
 
-      <h2>8. Data retention and deletion</h2>
+      <h2>9. Data retention and deletion</h2>
       <p>
         Your account and content data are stored for as long as your account
         exists. You can delete the account from inside the app, under
@@ -374,13 +452,20 @@
         >, answered within 30 days.
       </p>
 
-      <h2>9. Third-party services used</h2>
+      <h2>10. Third-party services used</h2>
       <p>
         Aluza uses the following Google Firebase services: Firebase
         Authentication (sign-in), Cloud Firestore (data storage), Firebase Cloud
         Messaging (notifications), Firebase Analytics (usage analytics), and
-        Firebase Crashlytics (crash reports). Use of these services is also
-        subject to
+        Firebase Crashlytics (crash reports). In voice capture, the audio is
+        sent to <strong>OpenAI</strong> for transcription and reading (section
+        5), subject to the
+        <a
+          href="https://openai.com/policies/privacy-policy"
+          target="_blank"
+          rel="noopener"
+          >OpenAI Privacy Policy</a
+        >. Use of the Google services is also subject to
         <a
           href="https://policies.google.com/privacy"
           target="_blank"
@@ -389,7 +474,7 @@
         >.
       </p>
 
-      <h2>10. Contact</h2>
+      <h2>11. Contact</h2>
       <p>
         Questions about this policy or your data, including account-deletion
         requests, can be sent to:

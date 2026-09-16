@@ -158,10 +158,37 @@ sumia — e nenhuma delas aparece nos testes de componente:
    nada; o tempo decorrido virava a época Unix inteira e o corte de 1 minuto
    encerrava a gravação 200 ms depois de começar. Virou `useSharedValue`.
 
+## Privacidade — o que precisa estar declarado
+
+O áudio sai do aparelho, então a declaração deixa de ser opcional antes de
+qualquer distribuição (TestFlight externo, App Store, Play).
+
+Feito no repositório:
+
+- `public/privacidade.html` ganhou a seção 5 ("Captura por voz"), a permissão
+  `RECORD_AUDIO` na lista do Android, a OpenAI na lista de terceiros, e a
+  correção da frase que dizia que o app não pedia microfone. Só vale depois de
+  `firebase deploy --only hosting`.
+- `PrivacyInfo.xcprivacy` declara `NSPrivacyCollectedDataTypeAudioData`
+  (vinculado à conta, finalidade "funcionalidade do app", sem rastreamento).
+- `NSMicrophoneUsageDescription` no `Info.plist` — hoje só em português; uma
+  `InfoPlist.strings` em inglês seria o passo seguinte.
+
+Nos consoles, por conta do dono:
+
+- **App Store Connect → App Privacy**: acrescentar _User Content → Audio Data_,
+  vinculada à identidade, finalidade _App Functionality_, sem rastreamento.
+- **Play Console → Data safety**: _Audio → Voice or sound recordings_,
+  coletada, compartilhada com terceiro (OpenAI), finalidade funcionalidade do
+  app; transmitida criptografada; não retida por nós.
+
+O que o servidor faz: `functions/voice.js` mantém o áudio em memória durante o
+pedido e não escreve nada — nem Firestore, nem Storage, nem log com o
+conteúdo. O aparelho guarda a última gravação por 5 minutos (`audioCacheMs`)
+para o reenvio.
+
 ## O que falta
 
-- **Privacidade da App Store** — o áudio sai do aparelho; declarar no
-  formulário de privacidade.
 - **Rebuild nos dois sistemas** depois da instalação do gravador nativo
   (`pod install` no iOS, gradle no Android).
 - **Descoberta (§10 da spec)** — `capturePrefs`, `typedStreak`,
