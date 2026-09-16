@@ -1,7 +1,10 @@
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
 import { ThemeProvider } from 'styled-components/native';
 
-import { OnboardingScreen } from '../src/app/components/OnboardingScreen';
+import {
+  OnboardingScreen,
+  type OnboardingOutcome,
+} from '../src/app/components/OnboardingScreen';
 import { onboardingSteps } from '../src/app/components/onboarding/onboardingSteps';
 import { lightTheme } from '../src/app/theme/theme';
 import { getTaskCopy } from '../src/features/tasks/presentation/localization/taskCopy';
@@ -14,13 +17,20 @@ afterEach(() => {
   });
 });
 
-function renderOnboarding(onFinish: (outcome: 'invite' | 'later') => void) {
+function renderOnboarding(
+  onFinish: (outcome: OnboardingOutcome) => void,
+  invited = false,
+) {
   let tree: ReturnType<typeof create> | null = null;
 
   act(() => {
     tree = create(
       <ThemeProvider theme={lightTheme}>
-        <OnboardingScreen copy={getTaskCopy('pt-BR')} onFinish={onFinish} />
+        <OnboardingScreen
+          copy={getTaskCopy('pt-BR')}
+          invited={invited}
+          onFinish={onFinish}
+        />
       </ThemeProvider>,
     );
   });
@@ -38,6 +48,35 @@ function press(node: ReactTestInstance) {
 }
 
 describe('first-run walk-through', () => {
+  it('offers the space they were invited to, not a second one of their own', () => {
+    const onFinish = jest.fn();
+    const tree = renderOnboarding(onFinish, true);
+    const copy = getTaskCopy('pt-BR');
+
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+
+    const texts = tree.root
+      .findAll(node => (node.type as unknown) === 'Text')
+      .flatMap(node =>
+        node.children.filter(
+          (child): child is string => typeof child === 'string',
+        ),
+      );
+
+    expect(texts).toContain(copy.onboarding.invite.invitedAction);
+    // Neither of the usual answers is theirs: one makes a second space, the
+    // other puts them alone in it.
+    expect(texts).not.toContain(copy.onboarding.invite.action);
+    expect(texts).not.toContain(copy.onboarding.invite.later);
+    expect(
+      tree.root.findAllByProps({ testID: 'onboarding-invite-later' }),
+    ).toHaveLength(0);
+
+    press(tree.root.findByProps({ testID: 'onboarding-invite' }));
+    expect(onFinish).toHaveBeenCalledWith('join');
+  });
+
   it('shows three cut-outs of the product and ends on the invite step', () => {
     const onFinish = jest.fn();
     const tree = renderOnboarding(onFinish);

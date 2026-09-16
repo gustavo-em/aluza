@@ -7,6 +7,10 @@
     <!-- Asked for at runtime on Android 13+, and never on a cold start: the
          first shared project on screen, or the switch in Ajustes. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Asked for at runtime, on the first tap of the disc in the capture
+         sheet and never before it: a note somebody speaks is turned into
+         tasks on the server and the recording is not kept. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- The periodic check that reads the shared projects with the app
          closed, and the same check surviving a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

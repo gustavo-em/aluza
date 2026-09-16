@@ -33,10 +33,14 @@ import { brandGround, type BrandGround } from '../theme/brandGround';
 
 /** What the walk-through was answered with: the invite is the only answer that
  * asks the app to do something after it closes. */
-export type OnboardingOutcome = 'invite' | 'later';
+export type OnboardingOutcome = 'invite' | 'later' | 'join';
 
 interface OnboardingScreenProps {
   copy: TaskCopy;
+  /** Somebody who arrived by tapping an invite. The last page stops asking
+   * them to choose between making a space and going it alone: they were
+   * called to a space that already exists, and neither answer leads there. */
+  invited?: boolean;
   onFinish: (outcome: OnboardingOutcome) => void;
 }
 
@@ -139,7 +143,11 @@ function Share({ color }: { color: string }) {
  * to ask, and skipping past it by accident left people in the app with no
  * space and nobody in it.
  */
-export function OnboardingScreen({ copy, onFinish }: OnboardingScreenProps) {
+export function OnboardingScreen({
+  copy,
+  invited = false,
+  onFinish,
+}: OnboardingScreenProps) {
   const [step, setStep] = useState(0);
   const [pageWidth, setPageWidth] = useState(0);
   const window = useWindowDimensions();
@@ -213,6 +221,7 @@ export function OnboardingScreen({ copy, onFinish }: OnboardingScreenProps) {
   const skip = useCallback(() => goTo(total - 1), [goTo, total]);
   const later = useCallback(() => onFinish('later'), [onFinish]);
   const invite = useCallback(() => onFinish('invite'), [onFinish]);
+  const join = useCallback(() => onFinish('join'), [onFinish]);
 
   return (
     <Cover
@@ -294,29 +303,48 @@ export function OnboardingScreen({ copy, onFinish }: OnboardingScreenProps) {
                   {isInvite ? (
                     <InviteFooter>
                       <Note $color={brandGround.onSolMuted}>
-                        {copy.onboarding.invite.noteLead}{' '}
-                        <NoteSpace>{copy.onboarding.demo.spaceName}</NoteSpace>{' '}
-                        {copy.onboarding.invite.noteTail}
+                        {invited ? (
+                          copy.onboarding.invite.invitedNote
+                        ) : (
+                          <>
+                            {copy.onboarding.invite.noteLead}{' '}
+                            <NoteSpace>
+                              {copy.onboarding.demo.spaceName}
+                            </NoteSpace>{' '}
+                            {copy.onboarding.invite.noteTail}
+                          </>
+                        )}
                       </Note>
 
                       <Invite
-                        accessibilityLabel={copy.onboarding.invite.action}
-                        onPress={invite}
+                        accessibilityLabel={
+                          invited
+                            ? copy.onboarding.invite.invitedAction
+                            : copy.onboarding.invite.action
+                        }
+                        onPress={invited ? join : invite}
                         testID={id('onboarding-invite')}
                       >
                         <Share color={tone.buttonInk} />
                         <InviteText $color={tone.buttonInk}>
-                          {copy.onboarding.invite.action}
+                          {invited
+                            ? copy.onboarding.invite.invitedAction
+                            : copy.onboarding.invite.action}
                         </InviteText>
                       </Invite>
 
-                      <Later
-                        accessibilityLabel={copy.onboarding.invite.later}
-                        onPress={later}
-                        testID={id('onboarding-invite-later')}
-                      >
-                        <LaterText>{copy.onboarding.invite.later}</LaterText>
-                      </Later>
+                      {/* No second answer for somebody who already has one:
+                          "start alone" would be them refusing the invite they
+                          came in with. */}
+                      {invited ? null : (
+                        <Later
+                          accessibilityLabel={copy.onboarding.invite.later}
+                          onPress={later}
+                          testID={id('onboarding-invite-later')}
+                        >
+                          <LaterText>{copy.onboarding.invite.later}</LaterText>
+                        </Later>
+                      )}
 
                       <DotsCentred>
                         {onboardingSteps

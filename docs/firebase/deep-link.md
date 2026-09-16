@@ -9,7 +9,7 @@ abre o navegador numa página em branco não é um convite, é um beco.
 | Peça                         | Onde                                            | Estado                                         |
 | ---------------------------- | ----------------------------------------------- | ---------------------------------------------- |
 | Página e JSON do convite     | `functions/invite.js`                           | no ar em `/e/<token>`                          |
-| Lojas (id da Apple, package) | `functions/stores.js`                           | App Store preenchida; Play vazia               |
+| Lojas (id da Apple, package) | `functions/stores.js`                           | App Store e Play preenchidas                   |
 | Rewrite `/e/**` → função     | `firebase.json`                                 | pronto                                         |
 | Associação iOS               | `public/.well-known/apple-app-site-association` | pronta                                         |
 | Associação Android           | `public/.well-known/assetlinks.json`            | pronta (release + debug)                       |
@@ -36,29 +36,22 @@ curl -sI https://ideiasorganizetask.web.app/.well-known/apple-app-site-associati
 
 ## O que falta
 
-### Ligar o botão da Play
+### O botão da Play
 
-Enquanto `ANDROID_PACKAGE` estiver vazio, a página de convite não mostra botão
-da Play: quem chega de Android vê que ela chega em breve e que o código do
-convite continua valendo. No dia em que a ficha estiver no ar, uma linha em
-`functions/stores.js`:
-
-```js
-const ANDROID_PACKAGE = 'com.ideiasorganizetask';
-```
-
-e a linha equivalente no site, `LOJAS.android` em `docs/index.html` e
-`public/index.html` (os dois arquivos são cópias e mudam juntos):
-
-```js
-android: 'https://play.google.com/store/apps/details?id=com.ideiasorganizetask',
-```
-
-Depois:
+`ANDROID_PACKAGE` em `functions/stores.js` e `LOJAS.android` no site
+(`docs/index.html` e `public/index.html`, cópias que mudam juntas) foram
+preenchidos em 2026-09-15 com `com.ideiasorganizetask`, na semana em que a
+ficha da Play entra no ar. Até a Google publicar, o link cai na página "não
+encontrado" da loja. Para tirar o botão de novo, basta esvaziar a constante
+(`''`) e o site volta a dizer "Em breve no Google Play":
 
 ```bash
 firebase deploy --only functions,hosting
 ```
+
+O site lê o `userAgent` e põe a loja do próprio aparelho primeiro e em
+destaque; a outra fica como segundo botão. No computador a ordem é iPhone,
+depois Android.
 
 ### Play App Signing
 
