@@ -32,6 +32,9 @@ import { systemClock } from '../features/tasks/infrastructure/clock/systemClock'
 import { systemHaptics } from '../features/tasks/infrastructure/haptics/systemHaptics';
 import { firestoreShareGateway } from '../features/tasks/infrastructure/sharing/firestoreShareGateway';
 import { systemClipboard } from '../features/tasks/infrastructure/sharing/systemClipboard';
+import { firebaseCaptureInterpreter } from '../features/tasks/infrastructure/capture/firebaseCaptureInterpreter';
+import { firebaseVoiceCapture } from '../features/tasks/infrastructure/voice/firebaseVoiceCapture';
+import { nitroVoiceRecorder } from '../features/tasks/infrastructure/voice/nitroVoiceRecorder';
 import {
   clearLocalTaskData,
   createLocalTaskStores,
@@ -69,6 +72,7 @@ import { asyncStoragePreferencesStore } from './infrastructure/preferences/async
 import { asyncStorageReviewInvitationStore } from './infrastructure/review/asyncStorageReviewInvitationStore';
 import { systemAppReviewPrompter } from './infrastructure/review/systemAppReviewPrompter';
 import { youReselectAction } from './navigation/tabReselect';
+import { playInstallReferrer } from '../features/tasks/infrastructure/install/playInstallReferrer';
 import { useIncomingInvite } from './session/useIncomingInvite';
 import { useReviewInvitation } from './session/useReviewInvitation';
 import { useLocalWorkspace } from './session/useLocalWorkspace';
@@ -182,6 +186,9 @@ function AppContent({
     shareGateway: firestoreShareGateway,
     groupStreakStore: stores.groupStreakStore,
     clipboard: systemClipboard,
+    captureInterpreter: firebaseCaptureInterpreter,
+    voiceRecorder: nitroVoiceRecorder,
+    voiceCapture: firebaseVoiceCapture,
     identity,
     language: app.language,
     dayCapacity: app.dayCapacity,
@@ -405,8 +412,10 @@ function AppContent({
               focus={focusRow}
               language={app.language}
               onChooseFocusDuration={chooseFocusDurationFor}
+              onVoiceUsed={app.markVoiceCaptureUsed}
               tabReselect={tabReselectCount}
               viewModel={tasks}
+              voiceUsed={app.voiceCaptureUsed}
             />
           ) : null}
 
@@ -417,7 +426,10 @@ function AppContent({
               incomingInviteToken={incomingInviteToken}
               language={app.language}
               onAutoInviteDone={onInviteIntentDone}
+              focusRunning={focusRow != null}
+              onChooseFocusDuration={chooseFocusDurationFor}
               onIncomingInviteHandled={onIncomingInviteHandled}
+              onVoiceUsed={app.markVoiceCaptureUsed}
               notificationPrompt={{
                 // The ask happens where the news comes from, and only for
                 // someone who actually shares a project.
@@ -430,6 +442,7 @@ function AppContent({
               ownProfile={profile.profile}
               tabReselect={tabReselectCount}
               viewModel={tasks}
+              voiceUsed={app.voiceCaptureUsed}
             />
           ) : null}
 
@@ -463,6 +476,7 @@ function AppContent({
                 onDeleteAccount={deleteAccount.open}
                 onReplayOnboarding={onReplayOnboarding}
                 onSignOut={signOut}
+                isAnonymous={auth.user?.isAnonymous ?? false}
                 personId={auth.user?.uid ?? null}
                 projectActivityNotifications={app.projectActivityNotifications}
                 projectActivityBlocked={activity.isAllowed === false}
@@ -627,7 +641,14 @@ function AppShell({
   // Um convite tocado fora do app. Fica aqui, no shell, porque entre o toque e
   // a tela que sabe o que fazer com ele há um login inteiro — e quem entra por
   // convite normalmente ainda não tem conta.
-  const incomingInvite = useIncomingInvite();
+  const incomingInvite = useIncomingInvite({
+    referrer: playInstallReferrer,
+    // Once, and only once it can be remembered: Play keeps the referrer
+    // readable for the life of the install, so re-reading it every launch
+    // would reopen the same invite forever.
+    ready: app.isRestored && !app.installReferrerRead,
+    onRead: app.markInstallReferrerRead,
+  });
   const workspaceStatus = useLocalWorkspace(
     authStatus === 'signedIn' ? personId : null,
     firestoreWorkspaceBackup,
@@ -658,6 +679,9 @@ function AppShell({
       .onboardingFinished({ outcome })
       .catch(() => undefined);
     if (!app.hasSeenOnboarding) app.finishOnboarding();
+    // Only the invite leaves something to do. `join` leaves nothing: the
+    // token is already held, and the space it opens is somebody else's —
+    // making one here would be the second space nobody asked for.
     if (outcome === 'invite') setInviteIntent(true);
   };
 
@@ -717,7 +741,11 @@ function AppShell({
       </View>
 
       {isShowingOnboarding ? (
-        <OnboardingScreen copy={app.copy} onFinish={finishOnboarding} />
+        <OnboardingScreen
+          copy={app.copy}
+          invited={incomingInvite.token != null}
+          onFinish={finishOnboarding}
+        />
       ) : null}
 
       {isOpening ? (

@@ -7,7 +7,7 @@ import {
   useState,
   type ComponentRef,
 } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Keyboard, Linking, ScrollView, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,6 +17,7 @@ import styled, { useTheme } from 'styled-components/native';
 
 import { flatReselectAction } from '../../../../app/navigation/tabReselect';
 import { markSheetPress, useRenderCount } from '../../../../app/perf/sheetPerf';
+import { reminderDayOptions } from '../../domain/DeadlineReminder';
 import { type Task } from '../../domain/Task';
 import { findGroupById, type TaskGroup } from '../../domain/TaskGroup';
 import {
@@ -44,6 +45,7 @@ import {
 } from '../../../../app/animation/motion';
 import type { TasksViewModel } from '../view-models/useTasksViewModel';
 import { AgoraCard } from '../views/AgoraCard';
+import { VoiceSheet } from '../views/voice/VoiceSheet';
 import { CaughtUpCard, EmptyStateCard } from '../views/CaughtUpCard';
 import { ConfirmDialog } from '../views/ConfirmDialog';
 import { ChevronGlyph, ProjectGlyph } from '../views/FieldGlyphs';
@@ -53,6 +55,7 @@ import {
 } from '../../../../app/theme/buttonText';
 import { FloatingAction } from '../views/FloatingAction';
 import { PressableScale } from '../views/PressableScale';
+import { BatchCaptureSheet } from '../views/BatchCaptureSheet';
 import { QuickCaptureSheet } from '../views/QuickCaptureSheet';
 import { SectionHeader } from '../views/SectionHeader';
 import { TaskRow, type FocusRowState } from '../views/TaskRow';
@@ -77,6 +80,10 @@ interface TodayScreenProps {
   /** How many times the tab already open has been tapped again. This screen
    * has no level to leave, so each new value takes the list back to the top. */
   tabReselect?: number;
+  /** True once a recording has reached a preview: the spoken example under
+   * the disc is shown until then and never again. */
+  voiceUsed?: boolean;
+  onVoiceUsed?: () => void;
 }
 
 /**
@@ -90,12 +97,18 @@ export function TodayScreen({
   onChooseFocusDuration,
   focus = null,
   tabReselect = 0,
+  voiceUsed = false,
+  onVoiceUsed,
 }: TodayScreenProps) {
   const theme = useTheme();
   useRenderCount('TodayScreen');
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const todayRestTop = useRef(0);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  // The batch sheet, and what it opens on: empty from the satellite, or the
+  // text the single sheet noticed was a list.
+  const [batchText, setBatchText] = useState<string | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [grouping, setGrouping] = useState<HomeGrouping>('deadline');
@@ -440,14 +453,62 @@ export function TodayScreen({
         })}
       </Content>
 
+      {/* One plus. Tapped it opens the sheet that listens; held, the sheet
+          that types. The white satellite that used to live above it named a
+          feature nobody found, and named it in words nobody could act on. */}
       <FloatingAction
         label={copy.today.capture}
+        onLongPress={() => {
+          markSheetPress('QuickCaptureSheet');
+          setIsCapturing(true);
+        }}
         onPress={() => {
           markSheetPress('QuickCaptureSheet');
           setIsCapturing(true);
         }}
         testID="today-capture"
       />
+
+      {isListening &&
+      viewModel.voiceRecorder != null &&
+      viewModel.voiceCapture != null ? (
+        <VoiceSheet
+          capture={viewModel.voiceCapture}
+          copy={copy}
+          language={language}
+          nowMs={viewModel.nowMs}
+          onCancel={() => setIsListening(false)}
+          onCreate={tasks =>
+            viewModel.captureMany(
+              tasks.map(task => ({
+                text: task.title,
+                overrides: {
+                  dueAtMs: task.dueAtMs,
+                  // Only when it was actually said; otherwise the task takes
+                  // the same default a typed one does.
+                  ...(task.priority == null ? {} : { priority: task.priority }),
+                  // The soonest warning the deadline leaves room for.
+                  remindDaysBefore: task.remind
+                    ? reminderDayOptions(task.dueAtMs, viewModel.nowMs)[0] ??
+                      null
+                    : null,
+                },
+              })),
+              undefined,
+              'voice',
+            )
+          }
+          onOpenSettings={() => {
+            // The app's own settings page, which is where the microphone
+            // switch is — not the notification one.
+            Linking.openSettings().catch(() => undefined);
+          }}
+          onVoiceUsed={onVoiceUsed}
+          recorder={viewModel.voiceRecorder}
+          spaceId={null}
+          spaceName={null}
+        />
+      ) : null}
 
       {isCapturing ? (
         <QuickCaptureSheet
@@ -456,11 +517,54 @@ export function TodayScreen({
           lists={viewModel.lists}
           nowMs={viewModel.nowMs}
           onCancel={() => setIsCapturing(false)}
+          /* The single sheet is not a modal and the batch one is, so the
+             hand-over needs no wait: one closes, the other arrives. */
+          onSplitBatch={text => {
+            setIsCapturing(false);
+            markSheetPress('BatchCaptureSheet');
+            setBatchText(text);
+          }}
+          onStartVoice={
+            viewModel.canCaptureVoice
+              ? () => {
+                  // The keyboard is up when the microphone is tapped, and a
+                  // sheet laid out above it opens to a gap at the bottom
+                  // while it slides away. It goes first.
+                  Keyboard.dismiss();
+                  setIsCapturing(false);
+                  markSheetPress('VoiceSheet');
+                  setIsListening(true);
+                }
+              : undefined
+          }
           onSubmit={(typed, overrides, tookMs) =>
             viewModel.capture(typed, overrides, tookMs, 'today')
           }
+          voiceUsed={voiceUsed}
         />
       ) : null}
+
+      {batchText == null ? null : (
+        <BatchCaptureSheet
+          copy={copy}
+          initialText={batchText}
+          lists={viewModel.lists}
+          nowMs={viewModel.nowMs}
+          onCancel={() => setBatchText(null)}
+          onInterpret={
+            viewModel.canInterpretCapture
+              ? viewModel.interpretCapture
+              : undefined
+          }
+          onSubmit={(lines, listId) =>
+            viewModel.captureMany(
+              lines,
+              listId === undefined ? undefined : { listId },
+              'batch',
+            )
+          }
+        />
+      )}
 
       {editing == null || editingTask == null ? null : (
         <QuickCaptureSheet

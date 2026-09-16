@@ -12,8 +12,15 @@ import type { TrioStore } from '../../application/ports/TrioStore';
 import type { UsageReporter } from '../../application/ports/UsageReporter';
 import {
   captureTask,
+  captureTasks,
+  type CaptureLine,
   type CaptureOverrides,
 } from '../../application/useCases/captureTask';
+import type { CaptureInterpreter } from '../../application/ports/CaptureInterpreter';
+import type {
+  VoiceCapture,
+  VoiceRecorder,
+} from '../../application/ports/VoiceCapture';
 import { deleteTask } from '../../application/useCases/deleteTask';
 import { editTask, type TaskEdit } from '../../application/useCases/editTask';
 import {
@@ -110,6 +117,7 @@ import {
 import { createFeedbackSubscriber } from '../../infrastructure/events/createFeedbackSubscriber';
 import { createPersistenceSubscriber } from '../../infrastructure/events/createPersistenceSubscriber';
 import { createDeadlineReminderSubscriber } from '../../infrastructure/events/createDeadlineReminderSubscriber';
+import { createPullLedger } from '../../application/useCases/sharePushGate';
 import { createSharePushSubscriber } from '../../infrastructure/events/createSharePushSubscriber';
 import { syncDeadlineReminders } from '../../infrastructure/notifications/notifeeDeadlineScheduler';
 import { syncReminderAlerts } from '../../infrastructure/notifications/notifeeReminderScheduler';
@@ -129,6 +137,15 @@ export interface TasksDependencies {
   shareGateway: ShareGateway;
   groupStreakStore: GroupStreakStore;
   clipboard: Clipboard;
+  /** A reader on the server for the batch sheet, when one is wired in. With
+   * none, the sheet reads notes with its own patterns and offers nothing
+   * else. */
+  captureInterpreter?: CaptureInterpreter;
+  /** The microphone and the reader behind the listening sheet. Absent while
+   * no native recorder is installed, and the sheet then opens straight into
+   * typing — the plus behaves exactly as it always did. */
+  voiceRecorder?: VoiceRecorder;
+  voiceCapture?: VoiceCapture;
   /** The signed-in account's identity inside a shared project. Null only in
    * the instant between the shell mounting and auth resolving. */
   identity: {
@@ -194,6 +211,9 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
     shareGateway,
     groupStreakStore,
     clipboard,
+    captureInterpreter,
+    voiceRecorder,
+    voiceCapture,
     identity,
     language = 'pt-BR',
     dayCapacity = DEFAULT_DAY_CAPACITY,
@@ -232,6 +252,11 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
   );
   /** The stored map is in memory: only then may a day be counted or saved. */
   const [groupStreaksLoaded, setGroupStreaksLoaded] = useState(false);
+  // The task a focus block is running on, if any. It travels with the day so
+  // the others read "em foco" instead of "em aberto": the band is the one
+  // place the app says what somebody is doing right now, and without this it
+  // never did — the field went out as null from the start.
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [joinErrorKind, setJoinErrorKind] = useState<ShareErrorKind | null>(
     null,
   );
@@ -328,12 +353,34 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
     });
   }, [bus, clock, language, restored]);
 
+  /**
+   * What this device has read from the server, and as whom. Emptied whenever
+   * the account changes: signing out and back in as somebody else is exactly
+   * how a space was wiped, on one phone, with nothing else involved.
+   */
+  const ledger = useRef(createPullLedger());
+  /** Filled in below, once `refreshSharedList` exists: the subscriber is
+   * created before it and must not be rebuilt every time it changes. */
+  const refresh = useRef<(listId: string) => Promise<unknown>>(() =>
+    Promise.resolve(),
+  );
+
+  useEffect(() => {
+    ledger.current.forget();
+  }, [identity?.personId]);
+
   useEffect(() => {
     if (restored == null || identity == null) return;
 
     return createSharePushSubscriber(bus, {
       shareGateway,
       personId: identity.personId,
+      ledger: ledger.current,
+      // A project this device has not read yet: read it now, and the change
+      // that follows the read is what reaches the others.
+      onNeedsPull: listId => {
+        refresh.current(listId).catch(() => undefined);
+      },
     });
   }, [bus, identity, restored, shareGateway]);
 
@@ -397,6 +444,21 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
     [bus],
   );
 
+  // A block starting or ending anywhere in the app is heard here, the same
+  // way persistence hears a commit: the focus view model never has to know
+  // that shared projects exist.
+  useEffect(() => {
+    const started = bus.on('focus.started', event =>
+      setFocusTaskId(event.taskId),
+    );
+    const finished = bus.on('focus.finished', () => setFocusTaskId(null));
+
+    return () => {
+      started();
+      finished();
+    };
+  }, [bus]);
+
   useEffect(() => {
     const timer = setInterval(() => setNowMs(clock.now()), CLOCK_TICK_MS);
 
@@ -414,6 +476,34 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
     run(planDay(current.current, clock.now(), dayCapacity));
   }, [clock, dayCapacity, dayMs, restored, run]);
 
+  /**
+   * Tells the project who took a task that was written with people already
+   * on it. One write per person, on the same `assignments.<uid>` field the
+   * toggle in the sheet writes, so the rule that polices one polices the
+   * other. Optimistic like the toggle: the fichas are on screen already, and
+   * a refused write is reconciled by the next pull.
+   */
+  const publishAssignments = useCallback(
+    (listId: string, personIds: readonly string[]) => {
+      const list = findListById(current.current.lists, listId);
+      if (list?.share == null) return;
+
+      for (const personId of personIds) {
+        const taskIds = current.current.tasks
+          .filter(
+            entry => entry.listId === listId && isAssigned(entry, personId),
+          )
+          .map(entry => entry.id);
+
+        shareGateway.setAssignment(list.share, personId, taskIds).catch(() => {
+          // Nothing to say on screen: the next pull brings whatever the
+          // project really holds.
+        });
+      }
+    },
+    [shareGateway],
+  );
+
   const capture = useCallback(
     (
       typed: string,
@@ -424,17 +514,56 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
       origin?: CaptureOrigin | null,
     ) => {
       const now = clock.now();
+      const before = new Set(current.current.tasks.map(task => task.id));
+      const result = captureTask(
+        current.current,
+        typed,
+        { nowMs: now, createId, tookMs, origin },
+        overrides,
+      );
 
+      run(result);
+
+      // The task itself rides the debounced push; who took it is a field of
+      // its own on the project, written now. The use case already dropped
+      // anybody who is not in the space.
+      const created =
+        result.workspace.tasks.find(task => !before.has(task.id)) ?? null;
+      if (created != null && (created.assignedIds ?? []).length > 0) {
+        publishAssignments(created.listId, created.assignedIds ?? []);
+      }
+    },
+    [clock, publishAssignments, run],
+  );
+
+  /** Several lines from the batch sheet, as one commit. People chosen in
+   * a batch are not a thing: the lines carry only what the syntax carries. */
+  const captureMany = useCallback(
+    (
+      lines: readonly CaptureLine[],
+      overrides?: CaptureOverrides,
+      origin?: CaptureOrigin | null,
+    ) => {
       run(
-        captureTask(
+        captureTasks(
           current.current,
-          typed,
-          { nowMs: now, createId, tookMs, origin },
+          lines,
+          { nowMs: clock.now(), createId, origin },
           overrides,
         ),
       );
     },
     [clock, run],
+  );
+
+  /** The batch sheet's call to the reader on the server: null when there is
+   * none, so the sheet never draws an action with nothing behind it. */
+  const interpretCapture = useCallback(
+    (text: string) =>
+      captureInterpreter == null
+        ? Promise.resolve<readonly string[] | null>(null)
+        : captureInterpreter.interpret(text, language),
+    [captureInterpreter, language],
   );
 
   const toggle = useCallback(
@@ -788,26 +917,36 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
   const dayKey = useMemo(() => dayKeyOf(dayMs), [dayMs]);
 
   /** What this device took for today inside one shared project: the trio,
-   * narrowed to that project. Nothing about how the day is going. */
+   * narrowed to that project, and the task a block is running on. Nothing
+   * about how the day is going. */
   const myDayFor = useCallback(
     (listId: string, atMs: number): SharedMemberDay | null => {
       if (identity == null) return null;
 
-      const taskIds = current.current.trio.taskIds.filter(id =>
+      const inList = (id: string) =>
         current.current.tasks.some(
           task => task.id === id && task.listId === listId,
-        ),
-      );
+        );
+      const taken = current.current.trio.taskIds.filter(inList);
+      // The task a block is running on belongs to the day whether or not the
+      // trio picked it: somebody working on it now has taken it for today,
+      // and the band can only say "em foco" about a task the day holds.
+      const focused =
+        focusTaskId != null && inList(focusTaskId) ? focusTaskId : null;
+      const taskIds =
+        focused == null || taken.includes(focused)
+          ? taken
+          : [...taken, focused];
 
       return {
         personId: identity.personId,
         dayKey: dayKeyOf(atMs),
         taskIds,
-        focusTaskId: null,
+        focusTaskId: focused,
         updatedAtMs: atMs,
       };
     },
-    [identity],
+    [focusTaskId, identity],
   );
 
   // Publishing the day again only when what was taken actually changed: the
@@ -843,10 +982,11 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
   const pullDaysFor = useCallback(
     (listId: string) => {
       const list = findListById(current.current.lists, listId);
-      if (list?.share == null) return Promise.resolve();
+      const share = list?.share;
+      if (share == null) return Promise.resolve();
 
       return shareGateway
-        .pullDays(list.share, dayKeyOf(clock.now()))
+        .pullDays(share, dayKeyOf(clock.now()))
         .then(days => {
           // What this device published stays on screen even if the remote
           // day came back without it — a failed publish must never take a
@@ -911,7 +1051,9 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
       const day = myDayFor(list.id, dayMs);
       if (day == null) continue;
 
-      const signature = `${day.dayKey}:${[...day.taskIds].sort().join(',')}`;
+      const signature = `${day.dayKey}:${[...day.taskIds].sort().join(',')}:${
+        day.focusTaskId ?? ''
+      }`;
       if (publishedRef.current[list.id] === signature) continue;
 
       publishedRef.current[list.id] = signature;
@@ -970,12 +1112,13 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
   const refreshSharedList = useCallback(
     (listId: string) => {
       const list = findListById(current.current.lists, listId);
-      if (list?.share == null) return Promise.resolve();
+      const share = list?.share;
+      if (share == null) return Promise.resolve();
 
       setShareStatus('loading');
       setShareErrorKind(null);
       return shareGateway
-        .pull(list.share)
+        .pull(share)
         .then(remote => {
           if (remote == null) {
             // Taken down by its owner: this device gets the same outcome as
@@ -983,6 +1126,15 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
             run(deleteTaskList(current.current, listId, clock.now()));
           } else {
             run(applyRemoteList(current.current, listId, remote, clock.now()));
+            // Read, and by whom: from here this device may write the project
+            // back, because what it holds now came from the server.
+            if (identity != null) {
+              ledger.current.record(
+                share.token,
+                identity.personId,
+                clock.now(),
+              );
+            }
             // Layer A: the pull that already happened is also what tells the
             // person what the others did. No second read of the network.
             onRemoteProject?.(remote);
@@ -995,8 +1147,12 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
         })
         .then(() => pullDaysFor(listId));
     },
-    [clock, onRemoteProject, pullDaysFor, run, shareGateway],
+    [clock, identity, onRemoteProject, pullDaysFor, run, shareGateway],
   );
+
+  useEffect(() => {
+    refresh.current = refreshSharedList;
+  }, [refreshSharedList]);
 
   const refreshAllSharedLists = useCallback(() => {
     const shared = current.current.lists.filter(list => list.share != null);
@@ -1135,6 +1291,16 @@ export function useTasksViewModel(dependencies: TasksDependencies) {
     dismissCelebration: () => setCelebratingStreak(null),
     listOf,
     capture,
+    captureMany,
+    interpretCapture,
+    /** Whether a reader on the server exists at all; the sheet shows its
+     * action only then. Reachability is its own answer, at call time. */
+    canInterpretCapture: captureInterpreter != null,
+    voiceRecorder,
+    voiceCapture,
+    /** Whether the plus can open a sheet that listens at all. */
+    canCaptureVoice:
+      voiceRecorder != null && voiceRecorder.available && voiceCapture != null,
     toggle,
     remove,
     edit,

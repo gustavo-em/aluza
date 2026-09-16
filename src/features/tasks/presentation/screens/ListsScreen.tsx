@@ -11,6 +11,8 @@ import {
 import {
   AccessibilityInfo,
   AppState,
+  Keyboard,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,12 +27,11 @@ import {
   disclosureEnter,
   fadeEnter,
   rowEnter,
-  rowExit,
-  rowLayout,
   screenEnter,
   SHEET_EXIT,
 } from '../../../../app/animation/motion';
 import { spacesReselectAction } from '../../../../app/navigation/tabReselect';
+import { reminderDayOptions } from '../../domain/DeadlineReminder';
 import { markSheetPress, useRenderCount } from '../../../../app/perf/sheetPerf';
 import { sortedReminders } from '../../domain/Reminder';
 import {
@@ -54,6 +55,7 @@ import {
   isShared,
   listColors,
   normalizeListName,
+  parseInviteToken,
   type ListColor,
   type ListMember,
   type TaskList,
@@ -96,11 +98,13 @@ import {
 import { templateAppearance } from '../models/projectTemplates';
 import { PressableScale } from '../views/PressableScale';
 import { ProjectEmptyState } from '../views/ProjectEmptyState';
+import { ProjectTaskRow } from '../views/ProjectTaskRow';
 import { QuickCaptureSheet } from '../views/QuickCaptureSheet';
+import { VoiceSheet } from '../views/voice/VoiceSheet';
 import { SectionHeader } from '../views/SectionHeader';
 import { SharedDayBand } from '../views/SharedDayBand';
 import { ShareSheet } from '../views/ShareSheet';
-import { TaskCheckbox } from '../views/TaskCheckbox';
+import { TakeOneSheet } from '../views/TakeOneSheet';
 import { TaskRow } from '../views/TaskRow';
 import { displayNameOf } from '../models/listName';
 
@@ -117,6 +121,18 @@ interface ListsScreenProps {
   onIncomingInviteHandled?: () => void;
   copy: TaskCopy;
   language: AppLanguage;
+  /** Opens the focus screen on this task, where the length is chosen before
+   * anything starts. Owned by the composition root, like on the day screen:
+   * the intent crosses screens. Without it the sheet of a task inside a
+   * space had no way to start a block at all. */
+  onChooseFocusDuration?: (task: Task) => void;
+  /** Whether a block is already running: one at a time, so the sheet of
+   * another task does not offer to start a second. */
+  focusRunning?: boolean;
+  /** True once a recording has reached a preview: the spoken example under
+   * the microphone is shown until then and never again. */
+  voiceUsed?: boolean;
+  onVoiceUsed?: () => void;
   /** The signed-in account's own profile as this device knows it, reservation
    * or not: their own row never waits on the network to show the name and
    * handle they chose. */
@@ -143,19 +159,16 @@ interface ListsScreenProps {
  * new prop defeats the memo that keeps the projects still. */
 const EMPTY_TASKS: readonly Task[] = [];
 const EMPTY_DAY_RECORDS: readonly SharedMemberDay[] = [];
-const EMPTY_ASSIGNEES: readonly ListMember[] = [];
 const EMPTY_ASSIGNED_IDS: readonly string[] = [];
 const EMPTY_GROUPS: readonly TaskGroup[] = [];
 const EMPTY_MEMBERS: readonly ListMember[] = [];
+const EMPTY_DAY_TASK_IDS: readonly string[] = [];
 
 /** The colour a new group opens on: the next one along from what the space
  * already holds, so two groups made in a row never look the same. */
 function nextGroupColor(groups: readonly TaskGroup[]): ListColor {
   return listColors[groups.length % listColors.length];
 }
-
-/** Past this many people on one task, the rest reads as `+N`. */
-const ASSIGNEE_CAP = 3;
 
 /** Long enough to be read after the space has taken the screen, short enough
  * that it never becomes furniture. */
@@ -203,7 +216,19 @@ export function ListsScreen({
   ownProfile,
   tabReselect = 0,
   viewModel,
+  voiceUsed = false,
+  onVoiceUsed,
+  onChooseFocusDuration,
+  focusRunning = false,
 }: ListsScreenProps) {
+  /** Where a spoken note would land: the space the sheet was opened from, and
+   * the group inside it when there is one. The preview says so, and the
+   * tasks are created there. */
+  const [listeningFor, setListeningFor] = useState<{
+    listId: string;
+    groupId: string | null;
+    name: string;
+  } | null>(null);
   const theme = useTheme();
   // Read from the context rather than the hook: the hook throws where there is
   // no provider, and the notice is not worth taking a screen down for.
@@ -248,6 +273,8 @@ export function ListsScreen({
   );
   const [actionsForListId, setActionsForListId] = useState<string | null>(null);
   const [sharingList, setSharingList] = useState<TaskList | null>(null);
+  // The space whose open tasks are being offered for today, from its band.
+  const [takingOneFor, setTakingOneFor] = useState<TaskList | null>(null);
   // The space just made, waiting for its invite sheet. iOS refuses to present
   // a modal while another one is still going away: asking for the share sheet
   // in the same commit that closes the editor left a sheet that never arrived
@@ -568,6 +595,7 @@ export function ListsScreen({
     editingGroup != null ||
     deletingGroup != null ||
     sharingList != null ||
+    takingOneFor != null ||
     pendingShare != null ||
     leavingList != null ||
     editing != null ||
@@ -618,6 +646,10 @@ export function ListsScreen({
     setShareJustCreated(false);
     setSharingList(list);
     setActionsForListId(null);
+  }, []);
+  const openTakeOne = useCallback((list: TaskList) => {
+    markSheetPress('TakeOneSheet');
+    setTakingOneFor(list);
   }, []);
   const openRename = useCallback((list: TaskList) => {
     setRenamingList(list);
@@ -735,10 +767,47 @@ export function ListsScreen({
     [copy.lists.memberYou, ownProfile, personId],
   );
 
+  // Who can be put on a task while it is written: everybody in the space,
+  // offered only where this account may edit it. A space of your own has
+  // nobody to offer, and a viewer never writes a task at all.
+  const captureAssignmentFor = useCallback(
+    (list: TaskList | null) =>
+      list?.share == null || personId == null || !canEdit(list, personId)
+        ? undefined
+        : { members: list.share.members, personId },
+    [personId],
+  );
+
+  // Opening a space is a read: whatever the others took or started since the
+  // last pull is fetched now, so the band is not a picture of the last time
+  // the app came to the foreground.
+  const refreshShared = viewModel.refreshSharedList;
+  const openShareToken = openList?.share?.token ?? null;
+
+  useEffect(() => {
+    if (openListId == null || openShareToken == null) return;
+
+    refreshShared(openListId);
+  }, [openListId, openShareToken, refreshShared]);
+
+  const dayTaskIds = viewModel.dayTaskIds ?? EMPTY_DAY_TASK_IDS;
+  // What the band's button offers: the space's open work the day does not
+  // hold yet, in the order the space lists it.
+  const takeOneCandidates = useMemo(
+    () =>
+      takingOneFor == null
+        ? EMPTY_TASKS
+        : (tasksByList.get(takingOneFor.id) ?? EMPTY_TASKS).filter(
+            task => isOpen(task) && !dayTaskIds.includes(task.id),
+          ),
+    [dayTaskIds, takingOneFor, tasksByList],
+  );
+
   const renderBlock = (list: TaskList, index: number, open: boolean) => (
     <ProjectBlock
       copy={copy}
       dayRecords={viewModel.sharedDays[list.id] ?? EMPTY_DAY_RECORDS}
+      dayTaskIds={dayTaskIds}
       index={index}
       key={list.id}
       language={language}
@@ -753,6 +822,7 @@ export function ListsScreen({
       onShare={openShare}
       onNewGroup={startGroup}
       onOpenGroup={openGroup}
+      onTakeOne={openTakeOne}
       onToggleActions={toggleActions}
       onToggleOpen={toggleOpen}
       onToggleTask={toggleTask}
@@ -1015,6 +1085,7 @@ export function ListsScreen({
       )}
       {capturingForList == null ? null : (
         <QuickCaptureSheet
+          captureAssignment={captureAssignmentFor(capturingForList)}
           copy={copy}
           initialListId={capturingForList.id}
           language={language}
@@ -1028,13 +1099,28 @@ export function ListsScreen({
               ? undefined
               : () => startGroup(capturingForList)
           }
+          onStartVoice={
+            viewModel.canCaptureVoice
+              ? () => {
+                  Keyboard.dismiss();
+                  setCapturingForList(null);
+                  setListeningFor({
+                    listId: capturingForList.id,
+                    groupId: null,
+                    name: capturingForList.name,
+                  });
+                }
+              : undefined
+          }
           onSubmit={(typed, overrides, tookMs) =>
             viewModel.capture(typed, overrides, tookMs, 'list')
           }
+          voiceUsed={voiceUsed}
         />
       )}
       {capturingForGroup == null || openList == null ? null : (
         <QuickCaptureSheet
+          captureAssignment={captureAssignmentFor(openList)}
           copy={copy}
           initialGroupId={capturingForGroup.id}
           initialListId={openList.id}
@@ -1042,9 +1128,63 @@ export function ListsScreen({
           lists={viewModel.lists}
           nowMs={viewModel.nowMs}
           onCancel={() => setCapturingForGroup(null)}
+          onStartVoice={
+            viewModel.canCaptureVoice
+              ? () => {
+                  Keyboard.dismiss();
+                  setCapturingForGroup(null);
+                  setListeningFor({
+                    listId: openList.id,
+                    groupId: capturingForGroup.id,
+                    name: capturingForGroup.name,
+                  });
+                }
+              : undefined
+          }
           onSubmit={(typed, overrides, tookMs) =>
             viewModel.capture(typed, overrides, tookMs, 'group')
           }
+          voiceUsed={voiceUsed}
+        />
+      )}
+
+      {listeningFor == null ||
+      viewModel.voiceRecorder == null ||
+      viewModel.voiceCapture == null ? null : (
+        <VoiceSheet
+          capture={viewModel.voiceCapture}
+          copy={copy}
+          language={language}
+          nowMs={viewModel.nowMs}
+          onCancel={() => setListeningFor(null)}
+          onCreate={tasks =>
+            viewModel.captureMany(
+              tasks.map(task => ({
+                text: task.title,
+                overrides: {
+                  dueAtMs: task.dueAtMs,
+                  ...(task.priority == null ? {} : { priority: task.priority }),
+                  // The soonest warning the deadline leaves room for.
+                  remindDaysBefore: task.remind
+                    ? reminderDayOptions(task.dueAtMs, viewModel.nowMs)[0] ??
+                      null
+                    : null,
+                },
+              })),
+              {
+                listId: listeningFor.listId,
+                groupId: listeningFor.groupId,
+              },
+              listeningFor.groupId == null ? 'list' : 'group',
+            )
+          }
+          onOpenSettings={() => {
+            Linking.openSettings().catch(() => undefined);
+          }}
+          onVoiceUsed={onVoiceUsed}
+          recorder={viewModel.voiceRecorder}
+          spaceId={listeningFor.listId}
+          spaceName={listeningFor.name}
         />
       )}
       {groupSheetList == null ? null : (
@@ -1140,6 +1280,18 @@ export function ListsScreen({
           }}
           onDeleteSubtask={subtaskId =>
             viewModel.deleteTaskSubtask(editingTask.id, subtaskId)
+          }
+          /* One block at a time: while one is running, the sheet of another
+             task does not offer to start a second one. */
+          onFocus={
+            onChooseFocusDuration == null || focusRunning
+              ? undefined
+              : () => {
+                  const subject = editingTask;
+
+                  setEditing(null);
+                  onChooseFocusDuration(subject);
+                }
           }
           onRenameSubtask={(subtaskId, title) =>
             viewModel.renameTaskSubtask(editingTask.id, subtaskId, title)
@@ -1266,6 +1418,20 @@ export function ListsScreen({
           status={viewModel.shareStatus}
         />
       )}
+      {takingOneFor == null ? null : (
+        <TakeOneSheet
+          copy={copy}
+          language={language}
+          list={takingOneFor}
+          nowMs={viewModel.nowMs}
+          onCancel={() => setTakingOneFor(null)}
+          onPick={taskId => {
+            viewModel.moveIntoDay(taskId);
+            setTakingOneFor(null);
+          }}
+          tasks={takeOneCandidates}
+        />
+      )}
       {invitePreviewToken == null ? null : (
         <InvitePreviewSheet
           copy={copy}
@@ -1294,8 +1460,17 @@ export function ListsScreen({
           }}
           onDismissError={viewModel.dismissJoinError}
           onJoin={input => {
+            // The token is remembered before the answer: a join that lands
+            // opens the space and says so, the same way a tapped link does,
+            // instead of dropping the person back on the index to look for
+            // what they just entered.
+            const token = parseInviteToken(input);
+
             viewModel.joinSharedList(input).then(ok => {
-              if (ok) setJoiningInvite(false);
+              if (!ok) return;
+
+              setJoiningInvite(false);
+              setJoinedToken(token);
             });
           }}
           onPasteFromClipboard={viewModel.pasteFromClipboard}
@@ -1306,146 +1481,12 @@ export function ListsScreen({
   );
 }
 
-// Enough room for the floating action and the tab bar under it: the last
-// thing on the list — the invite call in a group's empty state — has to end
-// above both, the same clearance the tasks screen already keeps.
-
-interface ProjectTaskProps {
-  copy: TaskCopy;
-  index: number;
-  isViewer: boolean;
-  language: AppLanguage;
-  list: TaskList;
-  nowMs: number;
-  task: Task;
-  onEditTask: (task: Task) => void;
-  onToggleTask: (taskId: string) => void;
-}
-
-/**
- * One task line inside a space.
- *
- * The line is the same `TaskRow` every list draws. What the space adds is who
- * took the task: the row has one slot on the right, and a task somebody took
- * shows their ficha there instead of a date. The row cannot be told that, so
- * the taken line is drawn here to the same rule — box 26, gap 14, title in the
- * body size — with the fichas in the slot. A viewer's line is drawn here too,
- * because only this one can refuse the tick.
- */
-const ProjectTask = memo(function ProjectTaskView({
-  copy,
-  index,
-  isViewer,
-  language,
-  list,
-  nowMs,
-  task,
-  onEditTask,
-  onToggleTask,
-}: ProjectTaskProps) {
-  const handleEdit = useCallback(() => onEditTask(task), [onEditTask, task]);
-  const handleToggle = useCallback(
-    () => onToggleTask(task.id),
-    [onToggleTask, task.id],
-  );
-
-  // The people who took it, in the project's own order, so the stack never
-  // reshuffles between two renders.
-  const assignees = useMemo(
-    () =>
-      list.share == null
-        ? EMPTY_ASSIGNEES
-        : list.share.members.filter(member =>
-            (task.assignedIds ?? []).includes(member.personId),
-          ),
-    [list.share, task.assignedIds],
-  );
-  const done = isCompleted(task);
-
-  // Closing a task used to drop it back to the plain row, which threw away
-  // the fichas of whoever had taken it and put the weight badge where their
-  // faces had been. Who did it is the one thing worth keeping on a line that
-  // is already done, so the taken line stays taken.
-  if (!isViewer && assignees.length === 0) {
-    return (
-      <TaskRow
-        copy={copy}
-        index={index}
-        language={language}
-        lens="list"
-        listColor={null}
-        listIcon={null}
-        listName={null}
-        nowMs={nowMs}
-        onEdit={handleEdit}
-        onToggle={handleToggle}
-        sectionId={`space-${list.id}`}
-        task={task}
-      />
-    );
-  }
-
-  const shown = assignees.slice(0, ASSIGNEE_CAP);
-  const overflow = assignees.length - shown.length;
-
-  return (
-    <TakenRow
-      entering={rowEnter(index)}
-      exiting={rowExit()}
-      layout={rowLayout()}
-    >
-      <TaskCheckbox
-        accessibilityLabel={task.title}
-        checked={done}
-        disabled={isViewer}
-        hitSlop={11}
-        onToggle={handleToggle}
-        testID={`task-checkbox-${task.id}`}
-      />
-      <TakenMain
-        accessibilityLabel={
-          assignees.length === 0
-            ? task.title
-            : `${task.title}. ${copy.lists.assignedTo(assignees.length)}`
-        }
-        accessibilityRole="button"
-        disabled={isViewer}
-        onPress={handleEdit}
-        scaleTo={0.99}
-        testID={`task-${task.id}`}
-      >
-        <TakenTitle $done={done} numberOfLines={1}>
-          {task.title}
-        </TakenTitle>
-      </TakenMain>
-      {shown.length === 0 ? null : (
-        <Takers
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          testID={`task-assignees-${task.id}`}
-        >
-          {shown.map((member, position) => (
-            <MemberChip
-              key={member.personId}
-              name={memberDisplayName(member, copy.lists.memberSomeone)}
-              personId={member.personId}
-              photoURL={member.photoURL ?? null}
-              size="fact"
-              stacked={position > 0}
-            />
-          ))}
-          {overflow > 0 ? (
-            <TakersOverflow>{`+${overflow}`}</TakersOverflow>
-          ) : null}
-        </Takers>
-      )}
-    </TakenRow>
-  );
-});
-
 interface ProjectBlockProps {
   copy: TaskCopy;
   dayRecords: readonly SharedMemberDay[];
+  /** Which tasks this device's day holds: the band offers to take one only
+   * while the space has open work outside of it. */
+  dayTaskIds: readonly string[];
   index: number;
   language: AppLanguage;
   list: TaskList;
@@ -1467,6 +1508,7 @@ interface ProjectBlockProps {
   onRenameList: (list: TaskList) => void;
   onRetryDay: (listId: string) => Promise<unknown>;
   onShare: (list: TaskList) => void;
+  onTakeOne: (list: TaskList) => void;
   onToggleActions: (listId: string) => void;
   onToggleOpen: (listId: string) => void;
   onToggleTask: (taskId: string) => void;
@@ -1482,6 +1524,7 @@ interface ProjectBlockProps {
 const ProjectBlock = memo(function ProjectBlockView({
   copy,
   dayRecords,
+  dayTaskIds,
   index,
   language,
   list,
@@ -1502,6 +1545,7 @@ const ProjectBlock = memo(function ProjectBlockView({
   onRenameList,
   onRetryDay,
   onShare,
+  onTakeOne,
   onToggleActions,
   onToggleOpen,
   onToggleTask,
@@ -1558,6 +1602,13 @@ const ProjectBlock = memo(function ProjectBlockView({
   const tookSomethingToday = dayEntries.some(
     entry => entry.member.personId === personId && entry.state !== 'absent',
   );
+  // The band offers to take a task only while there is one to take: open
+  // work in the space that the day does not already hold. Otherwise the
+  // control would open onto an empty list.
+  const canTakeOne =
+    !isViewer &&
+    !tookSomethingToday &&
+    workTasks.some(task => isOpen(task) && !dayTaskIds.includes(task.id));
   // Everyone else in the space, by the name they go by: the heading reads
   // "Você e Júlia", never the reader's own name back at them.
   const others = useMemo(
@@ -1597,6 +1648,7 @@ const ProjectBlock = memo(function ProjectBlockView({
     () => onRetryDay(list.id),
     [list.id, onRetryDay],
   );
+  const handleTakeOne = useCallback(() => onTakeOne(list), [list, onTakeOne]);
 
   const moreButton = canManage ? (
     <MoreButton
@@ -1833,7 +1885,7 @@ const ProjectBlock = memo(function ProjectBlockView({
               <MemberChip
                 initials={copy.lists.memberYouInitials}
                 name={viewer.name}
-                personId={viewer.personId}
+                personId={viewer?.personId ?? null}
                 photoURL={viewer.photoURL}
                 ring="background"
                 size="row"
@@ -1869,8 +1921,9 @@ const ProjectBlock = memo(function ProjectBlockView({
           copy={copy}
           entries={dayEntries}
           language={language}
+          personId={viewer?.personId ?? null}
           onRetry={handleRetryDay}
-          onTakeOne={isViewer || tookSomethingToday ? undefined : handleCapture}
+          onTakeOne={canTakeOne ? handleTakeOne : undefined}
           status={status}
           streakDays={streakDays}
         />
@@ -1951,7 +2004,7 @@ const ProjectBlock = memo(function ProjectBlockView({
         ) : null}
 
         {looseTasks.map((task, taskIndex) => (
-          <ProjectTask
+          <ProjectTaskRow
             copy={copy}
             index={taskIndex}
             isViewer={isViewer}
@@ -1961,6 +2014,7 @@ const ProjectBlock = memo(function ProjectBlockView({
             nowMs={nowMs}
             onEditTask={onEditTask}
             onToggleTask={onToggleTask}
+            sectionId={`space-${list.id}`}
             task={task}
           />
         ))}
@@ -2021,12 +2075,12 @@ const ProjectBlock = memo(function ProjectBlockView({
               Avulsas is where what has no space falls, so it never offers it. */}
           {list.id === INBOX_LIST_ID ? null : (
             <AddGroupButton
-              accessibilityLabel={copy.lists.groups.newGroup}
+              accessibilityLabel={copy.lists.groups.addGroup}
               onPress={handleNewGroup}
               testID={`add-group-${list.id}`}
             >
               <PlusGlyph color={theme.colors.mutedStrong} size={13} />
-              <AddGroupText>{copy.lists.groups.newGroup}</AddGroupText>
+              <AddGroupText>{copy.lists.groups.addGroup}</AddGroupText>
             </AddGroupButton>
           )}
         </EndActions>
@@ -2340,37 +2394,6 @@ const EmptyText = styled.Text`
   font-size: ${({ theme }) => theme.type.label}px;
   font-weight: 500;
   padding: ${({ theme }) => theme.spacing.medium}px 0px;
-`;
-/* A task somebody took, drawn to the row's own rule: box 26, gap 14, title
-   in the body size, and the fichas of who took it where the date would go. */
-const TakenRow = styled(Animated.View)`
-  flex-direction: row;
-  align-items: center;
-  gap: ${({ theme }) => theme.spacing.small + 6}px;
-  padding: ${({ theme }) => theme.spacing.medium - 3}px 0px;
-`;
-const TakenMain = styled(PressableScale)`
-  flex: 1;
-  min-width: 0px;
-`;
-const TakenTitle = styled.Text<{ $done: boolean }>`
-  flex-shrink: 1;
-  color: ${({ theme, $done }) =>
-    $done ? theme.colors.muted : theme.colors.text};
-  font-size: ${({ theme }) => theme.type.body}px;
-  font-weight: 500;
-  text-decoration-line: ${({ $done }) => ($done ? 'line-through' : 'none')};
-`;
-const Takers = styled.View`
-  flex-shrink: 0;
-  flex-direction: row;
-  align-items: center;
-`;
-const TakersOverflow = styled.Text`
-  margin-left: 4px;
-  color: ${({ theme }) => theme.colors.muted};
-  font-size: ${({ theme }) => theme.type.caption}px;
-  font-weight: 700;
 `;
 const AddTaskButton = styled(PressableScale)`
   flex-direction: row;

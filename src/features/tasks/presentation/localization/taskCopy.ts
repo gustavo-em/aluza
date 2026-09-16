@@ -64,6 +64,11 @@ export interface TaskCopy {
     noList: string;
     datePanelTitle: string;
     spacePanelTitle: string;
+    /** Who takes the task, chosen while it is still being written inside a
+     * shared space. The chip reads the names; the panel offers everybody. */
+    assignNobody: string;
+    assignChipLabel: (names: string) => string;
+    assignPanelHint: string;
     previousMonth: string;
     nextMonth: string;
     save: string;
@@ -108,6 +113,108 @@ export interface TaskCopy {
       /** The third thing a space can hold. Creating a group is a sibling of
        * creating a task, not a menu tucked away somewhere. */
       group: string;
+    };
+    /** Several tasks written or dictated in one breath, split into a
+     * preview before anything is added. */
+    /** The sheet that listens: what it says while it waits, while it writes
+     * it down, and when it cannot. Nothing here names the machinery — no
+     * "analisar", no "IA", no "transcrever". The sheet speaks for the app. */
+    voice: {
+      /** Under the disc, until the first recording that reaches a preview. */
+      readyHint: string;
+      readyHintShort: string;
+      /** The line under the disc: what this does that nothing else does.
+       * In ink, not in the quiet grey — it is the reason to try it. */
+      differential: string;
+      /** The unfocused field, which is a field: a verb, not a title. */
+      writeTask: string;
+      /** Under the microphone: what tapping it is going to do, including the
+       * part that matters most — nothing is created until it is checked. */
+      voicePromise: string;
+      /** After three seconds of quiet, the sheet asks instead of cutting. */
+      silenceAsk: string;
+      silenceKeep: string;
+      /** A failed send keeps the audio; the disc offers it again. */
+      resend: string;
+      sendNow: string;
+      failedKept: (seconds: number) => string;
+      /** The empty chips: a deadline and a priority nobody gave. */
+      noDue: string;
+      noPriority: string;
+      /** The phone speaking up before the deadline, on unless turned off. */
+      remindOn: string;
+      remindOff: string;
+      /** Beside the deadline panel's title: the words that were said. */
+      saidLabel: (said: string) => string;
+      duePanel: string;
+      calendar: string;
+      /** One spoken example, shown only until the feature has been used. */
+      readyExample: string;
+      recordingTitle: string;
+      recordingHint: string;
+      /** With `seconds` left of the minute. */
+      longWarning: (seconds: number) => string;
+      longStopped: string;
+      settlingTitle: string;
+      settlingHint: string;
+      settlingSlow: string;
+      failed: string;
+      retry: string;
+      previewTitle: string;
+      /** Beside the preview title: "em Casa". */
+      spaceChip: (space: string) => string;
+      personal: string;
+      create: (count: number) => string;
+      speakAgain: string;
+      merge: string;
+      remove: string;
+      undo: string;
+      overLimit: (total: number, rest: number) => string;
+      created: (count: number, space: string) => string;
+      empty: string;
+      emptyHint: string;
+      offline: string;
+      offlineHint: string;
+      offlineDisc: string;
+      denied: string;
+      deniedHint: string;
+      openSettings: string;
+      /** `NSMicrophoneUsageDescription` and the Android rationale. */
+      permissionRationale: string;
+      resume: string;
+      discard: (count: number) => string;
+      /** Added to the "?" help while the sheet is listening. */
+      helpVoice: string;
+      /** Shown to somebody who keeps typing and has never spoken. */
+      discoveryHint: string;
+      emptySpace: string;
+    };
+    batch: {
+      /** Spoken name of the satellite above the plus. */
+      open: string;
+      title: string;
+      hint: string;
+      placeholder: string;
+      previewTitle: string;
+      count: (count: number) => string;
+      /** The one call to the reader on the server, as a quiet action. */
+      aiAction: string;
+      aiBusy: string;
+      aiUndo: string;
+      aiError: string;
+      merge: string;
+      remove: string;
+      add: (count: number) => string;
+      empty: string;
+      single: string;
+      limit: (max: number, over: number) => string;
+      /** Under the space chip: how many lines already carry a `#space`. */
+      spaceMeta: (count: number) => string;
+      /** The word that joins two pieces back into one: "e" / "and". */
+      joiner: string;
+      /** In the single capture sheet, when the text looks like a list. */
+      detected: (count: number) => string;
+      split: string;
     };
     /** How often a reminder comes back, chosen on the reminder itself. */
     recurrence: {
@@ -293,6 +400,9 @@ export interface TaskCopy {
     dayBandEmpty: string;
     dayBandEmptyHint: string;
     dayBandTakeOne: string;
+    /** The sheet that picks one of the space's open tasks for today. */
+    takeOneHint: string;
+    takeOneEmpty: string;
     dayBandAllDone: (count: number) => string;
     dayBandStreak: (days: number) => string;
     dayBandOffline: string;
@@ -306,6 +416,13 @@ export interface TaskCopy {
     dayBandStateDone: string;
     /** Under the closed line: who closed it and at what time. */
     dayBandClosedAt: (time: string) => string;
+    /** Somebody else closed the task this person had taken. In a shared
+     * space that is half the news, so it is said rather than smoothed over:
+     * the band used to write "fechou às 9:12" under the name of whoever had
+     * taken it, whoever had actually ticked it. */
+    dayBandClosedBy: (name: string, time: string) => string;
+    /** Closed before the space was shared, so there is nobody to name. */
+    dayBandClosedNeutral: (time: string) => string;
     /** The open space's own heading: who is in it and how much is open —
      * "Você e Júlia · 9 abertas". `others` never includes the person reading. */
     spaceSubtitle: (others: readonly string[], open: number) => string;
@@ -381,6 +498,9 @@ export interface TaskCopy {
       groupCount: (count: number) => string;
       newGroup: string;
       newGroupIn: (space: string) => string;
+      /** The line at the end of a space that makes a group: says what it
+       * adds, beside the line that adds a task. */
+      addGroup: string;
       editGroup: string;
       create: string;
       save: string;
@@ -532,6 +652,11 @@ export interface TaskCopy {
       noteTail: string;
       action: string;
       later: string;
+      /** Somebody who arrived holding an invite. Neither of the two answers
+       * above is theirs: one would make a second space, the other would put
+       * them alone in it, and the space they were called to is elsewhere. */
+      invitedNote: string;
+      invitedAction: string;
     };
     /** The fixed cast inside the cut-outs. Not chrome: these are the words a
      * reader sees inside the product shown on each step, so they are written
@@ -625,6 +750,10 @@ const ptBR: TaskCopy = {
     noList: 'sem espaço',
     datePanelTitle: 'Data',
     spacePanelTitle: 'Espaço',
+    assignNobody: 'sem pessoa',
+    assignChipLabel: names => `Pessoas: ${names}`,
+    assignPanelHint:
+      'Quem fica com a tarefa. Dá para mudar depois, na própria tarefa.',
     previousMonth: 'Mês anterior',
     nextMonth: 'Próximo mês',
     save: 'Salvar',
@@ -667,6 +796,107 @@ const ptBR: TaskCopy = {
       task: 'Tarefa',
       reminder: 'Lembrete',
       group: 'Grupo',
+    },
+    voice: {
+      readyHint: 'Toque e fale — várias tarefas de uma vez',
+      readyHintShort: 'Toque e fale',
+      differential: 'Fale várias tarefas de uma vez, com prazo',
+      writeTask: 'Escrever uma tarefa',
+      voicePromise:
+        'Diga tudo de uma vez, do seu jeito. O app entende o áudio inteiro, separa em tarefas com prazo e mostra a lista para você conferir — nada é criado antes.',
+      silenceAsk: 'Terminou? Toque para anotar.',
+      silenceKeep: 'Ou continue falando — nada se perde.',
+      resend: 'Enviar de novo',
+      sendNow: 'Enviar agora',
+      failedKept: seconds =>
+        `${
+          seconds === 1
+            ? 'Seu 1 segundo está guardado'
+            : `Seus ${seconds} segundos estão guardados`
+        } — toque para enviar de novo, ou escreva acima.`,
+      noDue: 'sem prazo',
+      noPriority: 'sem prioridade',
+      remindOn: 'avisar antes',
+      remindOff: 'sem aviso',
+      saidLabel: said => `dito: “${said}”`,
+      duePanel: 'Prazo',
+      calendar: 'Calendário',
+      readyExample:
+        '“Pagar a luz amanhã, sexta o veterinário e ração essa semana.”',
+      recordingTitle: 'Pode falar.',
+      recordingHint:
+        'Fale tudo o que tiver. Toque quando terminar — ou só pare.',
+      longWarning: seconds =>
+        `Falta pouco — ${seconds} s. Depois eu anoto o que já veio.`,
+      longStopped: 'Parei em 1 min. Até aqui entrou tudo.',
+      settlingTitle: 'Anotando…',
+      settlingHint: 'Já já aparece.',
+      settlingSlow: 'Ainda anotando…',
+      failed: 'Não consegui agora. Sua gravação está guardada.',
+      retry: 'Tentar de novo',
+      previewTitle: 'Ficou assim',
+      spaceChip: space => `em ${space}`,
+      personal: 'Só para mim',
+      create: count =>
+        count === 1 ? 'Criar 1 tarefa' : `Criar ${count} tarefas`,
+      speakAgain: 'Falar de novo',
+      merge: 'Juntar com a de cima',
+      remove: 'Apagar',
+      undo: 'Desfazer',
+      overLimit: (total, rest) =>
+        `Foram ${total}. Estas ${total - rest} entram agora; ${
+          rest === 1 ? 'a outra aparece' : `as outras ${rest} aparecem`
+        } em seguida.`,
+      created: (count, space) =>
+        `${count === 1 ? '1 tarefa' : `${count} tarefas`} em ${space}`,
+      empty: 'Não peguei nada.',
+      emptyHint:
+        'Estava barulhento? Tente mais perto do celular — ou escreva acima.',
+      offline: 'Sem internet, a voz não chega.',
+      offlineHint: 'Escrever funciona normalmente: cada linha vira uma tarefa.',
+      offlineDisc: 'Volta quando a internet voltar',
+      denied: 'O microfone está fechado para o Aluza.',
+      deniedHint:
+        'Libere nos Ajustes para falar as tarefas. Escrever continua funcionando.',
+      openSettings: 'Abrir Ajustes',
+      permissionRationale:
+        'O Aluza usa o microfone para transformar o que você fala em tarefas.',
+      resume: 'Continuar de onde parou?',
+      discard: count =>
+        count === 1 ? 'Descartar 1 tarefa?' : `Descartar ${count} tarefas?`,
+      helpVoice:
+        'Falando, diga várias coisas de uma vez, com prazo em cada uma.',
+      discoveryHint: 'Com várias coisas na cabeça? Fale todas de uma vez.',
+      emptySpace: 'Nada aqui ainda. Toque no + e fale o que precisa ser feito.',
+    },
+    batch: {
+      open: 'Adicionar várias tarefas',
+      title: 'Várias de uma vez',
+      hint: 'Dite pelo microfone do teclado ou cole a lista — cada linha vira uma tarefa.',
+      placeholder:
+        'comprar pão amanhã, pagar a luz sexta, ligar pro contador !alta',
+      previewTitle: 'Prévia',
+      count: count => (count === 1 ? '1 tarefa' : `${count} tarefas`),
+      aiAction: 'Separar melhor',
+      aiBusy: 'Separando…',
+      aiUndo: 'Desfazer',
+      aiError: 'Não deu para usar a IA agora. A separação continua valendo.',
+      merge: 'Juntar com a de cima',
+      remove: 'Remover',
+      add: count =>
+        count === 1 ? 'Adicionar 1 tarefa' : `Adicionar ${count} tarefas`,
+      empty:
+        'Escreva ou dite a lista. Quebras de linha, ponto e vírgula e vírgulas separam as tarefas.',
+      single: 'Não achei separação. Vai entrar como uma tarefa só.',
+      limit: (max, over) =>
+        `Máximo de ${max} por vez. ${
+          over === 1 ? '1 linha ficou' : `${over} linhas ficaram`
+        } de fora.`,
+      spaceMeta: count =>
+        count === 1 ? '1 já tem espaço' : `${count} já têm espaço`,
+      joiner: 'e',
+      detected: count => `Parece ${count} tarefas.`,
+      split: 'Separar',
     },
     recurrence: {
       label: 'Quando repetir',
@@ -836,6 +1066,9 @@ const ptBR: TaskCopy = {
     dayBandEmptyHint:
       'Cada um escolhe poucas tarefas para o dia. Aqui vocês veem o que cada um vai fazer.',
     dayBandTakeOne: 'Escolher uma tarefa para hoje',
+    takeOneHint:
+      'Ela entra no seu dia e aparece aqui para quem está no espaço.',
+    takeOneEmpty: 'Nada em aberto para levar.',
     dayBandAllDone: count =>
       count === 1 ? 'Uma pessoa fechou hoje' : `Os ${count} fecharam hoje`,
     dayBandStreak: days =>
@@ -846,11 +1079,13 @@ const ptBR: TaskCopy = {
     dayBandRetry: 'Tentar de novo',
     dayBandRetrying: 'Tentando…',
     dayBandRetryFailed: 'Ainda não deu — tentar de novo',
-    dayBandAbsent: 'Ainda não levou nada',
+    dayBandAbsent: 'Sem tarefas para hoje',
     dayBandStateFocusing: 'em foco',
     dayBandStateOpen: 'em aberto',
     dayBandStateDone: 'concluída',
     dayBandClosedAt: time => `fechou às ${time}`,
+    dayBandClosedBy: (name, time) => `${name} fechou às ${time}`,
+    dayBandClosedNeutral: time => `concluída às ${time}`,
     spaceSubtitle: (others, open) => {
       const who =
         others.length === 0
@@ -924,6 +1159,7 @@ const ptBR: TaskCopy = {
       groupCount: count => `${count} ${count === 1 ? 'grupo' : 'grupos'}`,
       newGroup: 'Novo grupo',
       newGroupIn: space => `Novo grupo em ${space}`,
+      addGroup: 'Adicionar grupo de tarefas',
       editGroup: 'Editar grupo',
       create: 'Criar grupo',
       save: 'Salvar',
@@ -1095,13 +1331,16 @@ const ptBR: TaskCopy = {
         'para você. Chame quem divide ele com você — um link, sem cadastro antes.',
       action: 'Convidar quem divide o espaço',
       later: 'Começar sozinho por enquanto',
+      invitedNote:
+        'Você já tem um convite. Entre e o espaço aparece aqui, com o que já estiver nele.',
+      invitedAction: 'Entrar no espaço',
     },
     demo: {
       spacesLabel: 'ESPAÇOS',
       spaceName: 'Casa',
       spaceMeta: 'Você e Júlia · 9 abertas',
       spacePill: 'Casa · Você e Júlia',
-      combined: 'Hoje, no combinado',
+      combined: 'O dia de vocês',
       countSplit: '3 + 3',
       today: 'HOJE',
       focusPill: 'Léo está em foco · 18:40',
@@ -1187,6 +1426,10 @@ const enUS: TaskCopy = {
     noList: 'no space',
     datePanelTitle: 'Date',
     spacePanelTitle: 'Space',
+    assignNobody: 'nobody',
+    assignChipLabel: names => `People: ${names}`,
+    assignPanelHint:
+      'Who takes the task. It can be changed later, on the task itself.',
     previousMonth: 'Previous month',
     nextMonth: 'Next month',
     save: 'Save',
@@ -1227,6 +1470,102 @@ const enUS: TaskCopy = {
       task: 'Task',
       reminder: 'Reminder',
       group: 'Group',
+    },
+    voice: {
+      readyHint: 'Tap and talk — several tasks at once',
+      readyHintShort: 'Tap and talk',
+      differential: 'Say several tasks at once, with deadlines',
+      writeTask: 'Write a task',
+      voicePromise:
+        'Say it all at once, your way. The app hears the whole thing, turns it into tasks with deadlines and shows you the list to check — nothing is created before that.',
+      silenceAsk: 'Done? Tap to write it down.',
+      silenceKeep: 'Or keep talking — nothing is lost.',
+      resend: 'Send again',
+      sendNow: 'Send now',
+      failedKept: seconds =>
+        `Your ${seconds} second${seconds === 1 ? '' : 's'} ${
+          seconds === 1 ? 'is' : 'are'
+        } saved — tap to send again, or write above.`,
+      noDue: 'no deadline',
+      noPriority: 'no priority',
+      remindOn: 'remind me',
+      remindOff: 'no reminder',
+      saidLabel: said => `said: “${said}”`,
+      duePanel: 'Deadline',
+      calendar: 'Calendar',
+      readyExample:
+        '“Pay the power bill tomorrow, vet on Friday, dog food this week.”',
+      recordingTitle: 'Go ahead.',
+      recordingHint: "Say everything you've got. Tap when done — or just stop.",
+      longWarning: seconds =>
+        `Almost there — ${seconds} s. Then I'll write down what I've got.`,
+      longStopped: 'Stopped at 1 min. Everything up to here is in.',
+      settlingTitle: 'Writing it down…',
+      settlingHint: 'Just a moment.',
+      settlingSlow: 'Still writing…',
+      failed: "Couldn't do it right now. Your recording is saved.",
+      retry: 'Try again',
+      previewTitle: "Here's what came out",
+      spaceChip: space => `in ${space}`,
+      personal: 'Just for me',
+      create: count =>
+        count === 1 ? 'Create 1 task' : `Create ${count} tasks`,
+      speakAgain: 'Say it again',
+      merge: 'Merge with the one above',
+      remove: 'Remove',
+      undo: 'Undo',
+      overLimit: (total, rest) =>
+        `That's ${total}. These ${total - rest} go in now; the other ${
+          rest === 1 ? 'one comes' : `${rest} come`
+        } right after.`,
+      created: (count, space) =>
+        `${count === 1 ? '1 task' : `${count} tasks`} in ${space}`,
+      empty: "Didn't catch anything.",
+      emptyHint: 'Noisy around? Try closer to the phone — or write above.',
+      offline: "No internet, so voice can't get through.",
+      offlineHint: 'Writing works as usual: each line becomes a task.',
+      offlineDisc: 'Back when the internet is',
+      denied: 'The microphone is off for Aluza.',
+      deniedHint:
+        'Turn it on in Settings to talk your tasks. Writing still works.',
+      openSettings: 'Open Settings',
+      permissionRationale:
+        'Aluza uses the microphone to turn what you say into tasks.',
+      resume: 'Pick up where you left off?',
+      discard: count =>
+        count === 1 ? 'Discard 1 task?' : `Discard ${count} tasks?`,
+      helpVoice:
+        'When talking, say several things at once, each with its deadline.',
+      discoveryHint: 'Got a few things in mind? Say them all at once.',
+      emptySpace: 'Nothing here yet. Tap + and say what needs doing.',
+    },
+    batch: {
+      open: 'Add several tasks',
+      title: 'Several at once',
+      hint: 'Dictate with the keyboard mic or paste a list — each line becomes a task.',
+      placeholder:
+        'buy bread tomorrow, pay the bill friday, call the accountant !high',
+      previewTitle: 'Preview',
+      count: count => (count === 1 ? '1 task' : `${count} tasks`),
+      aiAction: 'Split better',
+      aiBusy: 'Splitting…',
+      aiUndo: 'Undo',
+      aiError: "Couldn't reach the AI right now. The split below still stands.",
+      merge: 'Merge into the one above',
+      remove: 'Remove',
+      add: count => (count === 1 ? 'Add 1 task' : `Add ${count} tasks`),
+      empty:
+        'Write or dictate the list. Line breaks, semicolons and commas split the tasks.',
+      single: 'No split found. This goes in as a single task.',
+      limit: (max, over) =>
+        `${max} at a time is the limit. ${
+          over === 1 ? '1 line was' : `${over} lines were`
+        } left out.`,
+      spaceMeta: count =>
+        count === 1 ? '1 already has a space' : `${count} already have a space`,
+      joiner: 'and',
+      detected: count => `Looks like ${count} tasks.`,
+      split: 'Split',
     },
     recurrence: {
       label: 'How often',
@@ -1394,6 +1733,9 @@ const enUS: TaskCopy = {
     dayBandEmptyHint:
       'Each person picks a few tasks for the day. Here you see what everyone will do.',
     dayBandTakeOne: 'Pick a task for today',
+    takeOneHint:
+      'It joins your day and shows up here for everyone in the space.',
+    takeOneEmpty: 'Nothing open to take.',
     dayBandAllDone: count =>
       count === 1 ? 'One person closed today' : `All ${count} closed today`,
     dayBandStreak: days =>
@@ -1404,11 +1746,13 @@ const enUS: TaskCopy = {
     dayBandRetry: 'Try again',
     dayBandRetrying: 'Trying…',
     dayBandRetryFailed: 'Still no luck — try again',
-    dayBandAbsent: 'Has not taken anything yet',
+    dayBandAbsent: 'No tasks for today',
     dayBandStateFocusing: 'in focus',
     dayBandStateOpen: 'open',
     dayBandStateDone: 'done',
     dayBandClosedAt: time => `closed at ${time}`,
+    dayBandClosedBy: (name, time) => `${name} closed it at ${time}`,
+    dayBandClosedNeutral: time => `done at ${time}`,
     spaceSubtitle: (others, open) => {
       const who =
         others.length === 0
@@ -1480,6 +1824,7 @@ const enUS: TaskCopy = {
       groupCount: count => `${count} ${count === 1 ? 'group' : 'groups'}`,
       newGroup: 'New group',
       newGroupIn: space => `New group in ${space}`,
+      addGroup: 'Add task group',
       editGroup: 'Edit group',
       create: 'Create group',
       save: 'Save',
@@ -1653,13 +1998,16 @@ const enUS: TaskCopy = {
         'space for you. Invite whoever shares it with you — a link, no sign-up first.',
       action: 'Invite whoever shares the space',
       later: 'Start on my own for now',
+      invitedNote:
+        'You already have an invite. Come in and the space shows up here, with whatever is already in it.',
+      invitedAction: 'Join the space',
     },
     demo: {
       spacesLabel: 'SPACES',
       spaceName: 'Home',
       spaceMeta: 'You and Júlia · 9 open',
       spacePill: 'Home · You and Júlia',
-      combined: 'Today, as agreed',
+      combined: 'Your day together',
       countSplit: '3 + 3',
       today: 'TODAY',
       focusPill: 'Léo is in focus · 18:40',
