@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import {
   BackHandler,
   Dimensions,
@@ -11,15 +11,18 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
 
 import {
   TOGGLE,
   scrimEnter,
   scrimExit,
-  sheetEnter,
-  sheetExit,
 } from '../../../../app/animation/motion';
+import {
+  sheetAnchor,
+  useSheetRise,
+} from '../../../../app/animation/useSheetRise';
 import { useSheetOpenTrace } from '../../../../app/perf/sheetPerf';
 import { guessGroupIcon, type TaskGroup } from '../../domain/TaskGroup';
 import {
@@ -158,7 +161,15 @@ export function GroupEditorSheet({
   }));
   const windowHeight = Dimensions.get('window').height;
   const ceiling = useAnimatedStyle(() => ({
-    maxHeight: windowHeight * 0.91 - keyboardHeight.value + 80,
+    maxHeight: windowHeight * 0.91 - keyboardHeight.value,
+  }));
+  // The floor comes from the safe area, the same as the space editor's.
+  const insets = useContext(SafeAreaInsetsContext);
+  const restingFloor = theme.spacing.large + (insets?.bottom ?? 0);
+  const keysFloor = theme.spacing.large;
+  const rise = useSheetRise();
+  const floor = useAnimatedStyle(() => ({
+    paddingBottom: keyboardHeight.value > 0 ? keysFloor : restingFloor,
   }));
 
   function submit() {
@@ -175,6 +186,7 @@ export function GroupEditorSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={onCancel}
       statusBarTranslucent
       transparent
@@ -190,10 +202,8 @@ export function GroupEditorSheet({
         </Scrim>
         <Lift style={lift}>
           <Sheet
-            entering={sheetEnter()}
-            exiting={sheetExit()}
             onLayout={traceOpen}
-            style={ceiling}
+            style={[ceiling, floor, rise]}
             testID="group-editor-sheet"
           >
             <Grabber />
@@ -388,13 +398,12 @@ const Body = styled(ScrollView)`
 `;
 
 const Sheet = styled(Animated.View)`
+  ${sheetAnchor}
   background-color: ${({ theme }) => theme.colors.card};
   border-top-left-radius: ${({ theme }) => theme.radii.extraLarge}px;
   border-top-right-radius: ${({ theme }) => theme.radii.extraLarge}px;
-  margin-bottom: -80px;
   max-height: 91%;
-  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px
-    ${({ theme }) => theme.spacing.large + 88}px;
+  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px 0px;
 `;
 
 const Grabber = styled.View`

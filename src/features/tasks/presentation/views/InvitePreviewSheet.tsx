@@ -9,12 +9,11 @@ import Animated from 'react-native-reanimated';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
 
+import { scrimEnter, scrimExit } from '../../../../app/animation/motion';
 import {
-  scrimEnter,
-  scrimExit,
-  sheetEnter,
-  sheetExit,
-} from '../../../../app/animation/motion';
+  sheetAnchor,
+  useSheetRise,
+} from '../../../../app/animation/useSheetRise';
 import { useSheetOpenTrace } from '../../../../app/perf/sheetPerf';
 import type { ShareErrorKind } from '../../domain/ShareError';
 import type { TaskCopy } from '../localization/taskCopy';
@@ -72,6 +71,7 @@ export function InvitePreviewSheet({
   // The context, not the hook: the hook throws where no provider is mounted,
   // and a missing inset is worth a few points of padding, never a crash.
   const insets = useContext(SafeAreaInsetsContext);
+  const rise = useSheetRise();
   const words = copy.lists.invitePreview;
 
   useEffect(() => {
@@ -148,6 +148,7 @@ export function InvitePreviewSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={onCancel}
       statusBarTranslucent
       transparent
@@ -163,12 +164,13 @@ export function InvitePreviewSheet({
         </Scrim>
         <Sheet
           accessibilityViewIsModal
-          entering={sheetEnter()}
-          exiting={sheetExit()}
           onLayout={traceOpen}
-          style={{
-            paddingBottom: theme.spacing.large + (insets?.bottom ?? 0),
-          }}
+          style={[
+            rise,
+            {
+              paddingBottom: theme.spacing.large + (insets?.bottom ?? 0),
+            },
+          ]}
           testID="invite-preview-sheet"
         >
           <Grabber />
@@ -285,6 +287,7 @@ const ScrimTouch = styled.Pressable`
 `;
 
 const Sheet = styled(Animated.View)`
+  ${sheetAnchor}
   background-color: ${({ theme }) => theme.colors.background};
   border-top-left-radius: ${({ theme }) => theme.radii.extraLarge}px;
   border-top-right-radius: ${({ theme }) => theme.radii.extraLarge}px;

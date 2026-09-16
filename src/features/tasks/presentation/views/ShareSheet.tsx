@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { BackHandler, Modal, Platform } from 'react-native';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { BackHandler, Modal, Platform, ScrollView } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
 
 import { useSheetOpenTrace } from '../../../../app/perf/sheetPerf';
@@ -20,9 +21,11 @@ import {
   rowEnter,
   scrimEnter,
   scrimExit,
-  sheetEnter,
-  sheetExit,
 } from '../../../../app/animation/motion';
+import {
+  sheetAnchor,
+  useSheetRise,
+} from '../../../../app/animation/useSheetRise';
 import type { AppLanguage, TaskCopy } from '../localization/taskCopy';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CheckGlyph, ProjectGlyph } from './FieldGlyphs';
@@ -99,6 +102,11 @@ export function ShareSheet({
 }: ShareSheetProps) {
   const theme = useTheme();
   const traceOpen = useSheetOpenTrace('ShareSheet');
+  // The floor comes from the safe area, not from a guessed margin: the sheet
+  // has to end under the gesture bar on both platforms, and on the iPhone a
+  // fixed overhang left the two buttons cut off below the screen.
+  const insets = useContext(SafeAreaInsetsContext);
+  const rise = useSheetRise();
   const [invitedAs, setInvitedAs] = useState<Exclude<ListRole, 'owner'>>(
     list.share?.invitedAs ?? 'editor',
   );
@@ -183,6 +191,7 @@ export function ShareSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={onCancel}
       statusBarTranslucent
       transparent
@@ -197,308 +206,332 @@ export function ShareSheet({
           />
         </Scrim>
         <Sheet
-          entering={sheetEnter()}
-          exiting={sheetExit()}
           onLayout={traceOpen}
+          style={[
+            rise,
+            { paddingBottom: theme.spacing.large + (insets?.bottom ?? 0) },
+          ]}
           testID="share-sheet"
         >
           <Grabber />
-          {justCreated ? (
-            <ReadyHead>
-              <Badge $tone={projectTone(theme, list.color)}>
-                <ProjectGlyph
-                  color={
-                    list.color === 'sun'
-                      ? theme.colors.onAccent
-                      : theme.colors.card
-                  }
-                  icon={list.icon}
-                  size={20}
-                />
-              </Badge>
-              <ReadyTexts>
-                <ReadyTitle accessibilityRole="header">
-                  {copy.lists.readyTitle(list.name)}
-                </ReadyTitle>
-                <ReadySubtitle>{copy.lists.readySubtitle}</ReadySubtitle>
-              </ReadyTexts>
-            </ReadyHead>
-          ) : (
-            <>
-              <Title accessibilityRole="header">
-                {`${copy.lists.share} ${list.name}`}
-              </Title>
-              <Hint>{copy.lists.shareHint}</Hint>
-            </>
-          )}
+          {/* Everything above the buttons scrolls: a space with many people
+              and a long history no longer pushes the way out off the phone. */}
+          <Body
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {justCreated ? (
+              <ReadyHead>
+                <Badge $tone={projectTone(theme, list.color)}>
+                  <ProjectGlyph
+                    color={
+                      list.color === 'sun'
+                        ? theme.colors.onAccent
+                        : theme.colors.card
+                    }
+                    icon={list.icon}
+                    size={20}
+                  />
+                </Badge>
+                <ReadyTexts>
+                  <ReadyTitle accessibilityRole="header">
+                    {copy.lists.readyTitle(list.name)}
+                  </ReadyTitle>
+                  <ReadySubtitle>{copy.lists.readySubtitle}</ReadySubtitle>
+                </ReadyTexts>
+              </ReadyHead>
+            ) : (
+              <>
+                <Title accessibilityRole="header">
+                  {`${copy.lists.share} ${list.name}`}
+                </Title>
+                <Hint>{copy.lists.shareHint}</Hint>
+              </>
+            )}
 
-          {list.share == null && justCreated ? (
-            /* The link was asked for the moment the space was made: the box
+            {list.share == null && justCreated ? (
+              /* The link was asked for the moment the space was made: the box
                is already there, waiting for it. */
-            <PanelBox testID="share-link-box">
-              <PanelHead>
-                <PanelTitle>{copy.lists.inviteLinkLabel}</PanelTitle>
-              </PanelHead>
-              <LinkLine>
-                <LinkText $pending>
-                  {status === 'loading'
-                    ? copy.lists.creatingLink
-                    : copy.lists.linkNotPublished}
-                </LinkText>
-              </LinkLine>
-            </PanelBox>
-          ) : list.share == null ? (
-            <SheetPrimaryButton
-              block
-              disabled={status === 'loading'}
-              label={
-                status === 'loading'
-                  ? copy.lists.creatingLink
-                  : copy.lists.createLink
-              }
-              onPress={handleCreateLink}
-              testID="share-create-link"
-            />
-          ) : (
-            <>
               <PanelBox testID="share-link-box">
                 <PanelHead>
                   <PanelTitle>{copy.lists.inviteLinkLabel}</PanelTitle>
                 </PanelHead>
-                <LinkLine accessibilityRole="text">
-                  <LinkText $pending={notPublished}>
-                    {buildInviteLink(list.share.token)}
+                <LinkLine>
+                  <LinkText $pending>
+                    {status === 'loading'
+                      ? copy.lists.creatingLink
+                      : copy.lists.linkNotPublished}
                   </LinkText>
-                  <CopyButton
-                    accessibilityLabel={copy.lists.copyLinkAccessible}
-                    accessibilityState={{ disabled: notPublished }}
-                    disabled={notPublished}
-                    hitSlop={8}
-                    onPress={handleCopy}
-                    testID="share-copy-link"
-                  >
-                    <CopyText $pending={notPublished}>
-                      {justCopied ? copy.lists.linkCopied : copy.lists.copyLink}
-                    </CopyText>
-                  </CopyButton>
                 </LinkLine>
-                {notPublished ? (
-                  <LinkNote testID="share-link-pending">
-                    {copy.lists.linkNotPublished}
-                  </LinkNote>
-                ) : (
-                  <LinkNote>
-                    {copy.lists.inviteLinkNote(
-                      list.share.invitedAs === 'editor',
-                    )}
-                  </LinkNote>
-                )}
               </PanelBox>
-
-              {!isOwner || justCreated ? null : (
-                <>
-                  <SectionLabel>{copy.lists.invitedAsLabel}</SectionLabel>
-                  <RoleRow>
-                    <RoleButton
-                      $selected={invitedAs === 'viewer'}
-                      accessibilityLabel={copy.lists.roleViewer}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: invitedAs === 'viewer' }}
-                      onPress={() => handleChangeInvitedAs('viewer')}
+            ) : list.share == null ? (
+              <SheetPrimaryButton
+                block
+                disabled={status === 'loading'}
+                label={
+                  status === 'loading'
+                    ? copy.lists.creatingLink
+                    : copy.lists.createLink
+                }
+                onPress={handleCreateLink}
+                testID="share-create-link"
+              />
+            ) : (
+              <>
+                <PanelBox testID="share-link-box">
+                  <PanelHead>
+                    <PanelTitle>{copy.lists.inviteLinkLabel}</PanelTitle>
+                  </PanelHead>
+                  <LinkLine accessibilityRole="text">
+                    <LinkText $pending={notPublished}>
+                      {buildInviteLink(list.share.token)}
+                    </LinkText>
+                    <CopyButton
+                      accessibilityLabel={copy.lists.copyLinkAccessible}
+                      accessibilityState={{ disabled: notPublished }}
+                      disabled={notPublished}
+                      hitSlop={8}
+                      onPress={handleCopy}
+                      testID="share-copy-link"
                     >
-                      <RoleContent>
-                        {invitedAs === 'viewer' ? (
-                          <RoleCheck>
-                            <CheckGlyph
-                              color={theme.colors.onSelected}
-                              size={14}
-                            />
-                          </RoleCheck>
-                        ) : null}
-                        <RoleButtonText
-                          $selected={invitedAs === 'viewer'}
-                          numberOfLines={1}
-                        >
-                          {copy.lists.roleViewer}
-                        </RoleButtonText>
-                      </RoleContent>
-                    </RoleButton>
-                    <RoleButton
-                      $selected={invitedAs === 'editor'}
-                      accessibilityLabel={copy.lists.roleEditor}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: invitedAs === 'editor' }}
-                      onPress={() => handleChangeInvitedAs('editor')}
+                      <CopyText $pending={notPublished}>
+                        {justCopied
+                          ? copy.lists.linkCopied
+                          : copy.lists.copyLink}
+                      </CopyText>
+                    </CopyButton>
+                  </LinkLine>
+                  {notPublished ? (
+                    <LinkNote testID="share-link-pending">
+                      {copy.lists.linkNotPublished}
+                    </LinkNote>
+                  ) : (
+                    <LinkNote>
+                      {copy.lists.inviteLinkNote(
+                        list.share.invitedAs === 'editor',
+                      )}
+                    </LinkNote>
+                  )}
+                </PanelBox>
+
+                {!isOwner || justCreated ? null : (
+                  <>
+                    <SectionLabel>{copy.lists.invitedAsLabel}</SectionLabel>
+                    <RoleRow>
+                      <RoleButton
+                        $selected={invitedAs === 'viewer'}
+                        accessibilityLabel={copy.lists.roleViewer}
+                        accessibilityRole="radio"
+                        accessibilityState={{
+                          selected: invitedAs === 'viewer',
+                        }}
+                        onPress={() => handleChangeInvitedAs('viewer')}
+                      >
+                        <RoleContent>
+                          {invitedAs === 'viewer' ? (
+                            <RoleCheck>
+                              <CheckGlyph
+                                color={theme.colors.onSelected}
+                                size={14}
+                              />
+                            </RoleCheck>
+                          ) : null}
+                          <RoleButtonText
+                            $selected={invitedAs === 'viewer'}
+                            numberOfLines={1}
+                          >
+                            {copy.lists.roleViewer}
+                          </RoleButtonText>
+                        </RoleContent>
+                      </RoleButton>
+                      <RoleButton
+                        $selected={invitedAs === 'editor'}
+                        accessibilityLabel={copy.lists.roleEditor}
+                        accessibilityRole="radio"
+                        accessibilityState={{
+                          selected: invitedAs === 'editor',
+                        }}
+                        onPress={() => handleChangeInvitedAs('editor')}
+                      >
+                        <RoleContent>
+                          {invitedAs === 'editor' ? (
+                            <RoleCheck>
+                              <CheckGlyph
+                                color={theme.colors.onSelected}
+                                size={14}
+                              />
+                            </RoleCheck>
+                          ) : null}
+                          <RoleButtonText
+                            $selected={invitedAs === 'editor'}
+                            numberOfLines={1}
+                          >
+                            {copy.lists.roleEditor}
+                          </RoleButtonText>
+                        </RoleContent>
+                      </RoleButton>
+                    </RoleRow>
+                    <Note>{copy.lists.roleChangeNote}</Note>
+                  </>
+                )}
+
+                {justCreated ? null : (
+                  <SectionLabel>{`${copy.lists.membersHeader.toUpperCase()} · ${
+                    members.length
+                  }`}</SectionLabel>
+                )}
+                {(justCreated ? [] : members).map((member, index) => {
+                  // The logged-in person is "Você" in their own list of
+                  // members; everybody else is the name and handle they chose.
+                  // The session's own uid, however the row got here: an entry
+                  // recorded before the profile existed is still this person.
+                  const isMe =
+                    member.personId === personId ||
+                    member.personId === identity?.personId;
+                  const displayName = isMe
+                    ? copy.lists.memberYou
+                    : memberDisplayName(member, copy.lists.memberSomeone);
+                  const handle = isMe
+                    ? identity?.handle ?? null
+                    : member.handle;
+
+                  return (
+                    <MemberRow
+                      entering={rowEnter(index)}
+                      key={member.personId}
+                      $last={index === members.length - 1}
                     >
-                      <RoleContent>
-                        {invitedAs === 'editor' ? (
-                          <RoleCheck>
-                            <CheckGlyph
-                              color={theme.colors.onSelected}
-                              size={14}
-                            />
-                          </RoleCheck>
-                        ) : null}
-                        <RoleButtonText
-                          $selected={invitedAs === 'editor'}
-                          numberOfLines={1}
-                        >
-                          {copy.lists.roleEditor}
-                        </RoleButtonText>
-                      </RoleContent>
-                    </RoleButton>
-                  </RoleRow>
-                  <Note>{copy.lists.roleChangeNote}</Note>
-                </>
-              )}
-
-              {justCreated ? null : (
-                <SectionLabel>{`${copy.lists.membersHeader.toUpperCase()} · ${
-                  members.length
-                }`}</SectionLabel>
-              )}
-              {(justCreated ? [] : members).map((member, index) => {
-                // The logged-in person is "Você" in their own list of
-                // members; everybody else is the name and handle they chose.
-                // The session's own uid, however the row got here: an entry
-                // recorded before the profile existed is still this person.
-                const isMe =
-                  member.personId === personId ||
-                  member.personId === identity?.personId;
-                const displayName = isMe
-                  ? copy.lists.memberYou
-                  : memberDisplayName(member, copy.lists.memberSomeone);
-                const handle = isMe ? identity?.handle ?? null : member.handle;
-
-                return (
-                  <MemberRow
-                    entering={rowEnter(index)}
-                    key={member.personId}
-                    $last={index === members.length - 1}
-                  >
-                    <MemberChip
-                      initials={isMe ? copy.lists.memberYouInitials : undefined}
-                      name={displayName}
-                      personId={member.personId}
-                      pending={!member.joined}
-                      photoURL={member.photoURL ?? null}
-                      size="large"
-                    />
-                    <MemberInfo>
-                      <MemberName numberOfLines={1} ellipsizeMode="tail">
-                        {displayName}
-                      </MemberName>
-                      {isMe && identity != null ? (
-                        <MemberSub numberOfLines={1} ellipsizeMode="tail">
-                          {handle == null
-                            ? identity.name
-                            : `${identity.name} · @${handle}`}
-                        </MemberSub>
-                      ) : handle == null ? null : (
-                        <MemberSub numberOfLines={1} ellipsizeMode="tail">
-                          {`@${handle}`}
-                        </MemberSub>
-                      )}
-                      {member.joined ? null : (
-                        <MemberSub>{copy.lists.pendingInvite}</MemberSub>
-                      )}
-                    </MemberInfo>
-                    {member.role === 'owner' ? (
-                      <RoleTag>{copy.lists.roleOwner}</RoleTag>
-                    ) : (
-                      <RoleTag>
-                        {member.role === 'editor'
-                          ? copy.lists.roleEditor
-                          : copy.lists.roleViewer}
-                      </RoleTag>
-                    )}
-                    {isOwner && !isMe ? (
-                      <RemoveButton
-                        accessibilityLabel={copy.lists.removeMember(
-                          displayName,
-                        )}
-                        hitSlop={14}
-                        onPress={() =>
-                          setConfirmingRemove({
-                            personId: member.personId,
-                            name: displayName,
-                          })
+                      <MemberChip
+                        initials={
+                          isMe ? copy.lists.memberYouInitials : undefined
                         }
-                      >
-                        <RemoveText>{copy.lists.removeMemberLabel}</RemoveText>
-                      </RemoveButton>
-                    ) : null}
-                  </MemberRow>
-                );
-              })}
-
-              {history.entries.length === 0 || justCreated ? null : (
-                <>
-                  <SectionHeader testID="share-join-history">
-                    <SectionLabel>{`${copy.lists.joinHistoryHeader.toUpperCase()} · ${
-                      history.total
-                    }`}</SectionLabel>
-                    <SectionRule />
-                  </SectionHeader>
-                  {history.entries.map((entry, index) => {
-                    const isMe =
-                      entry.member.personId === personId ||
-                      entry.member.personId === identity?.personId;
-                    const displayName = isMe
-                      ? copy.lists.memberYou
-                      : memberDisplayName(
-                          entry.member,
-                          copy.lists.memberSomeone,
-                        );
-
-                    return (
-                      <HistoryRow
-                        // Grouped into one node on purpose: read apart, the
-                        // row would end on a bare dash instead of saying
-                        // there is no date for this person.
-                        accessible
-                        accessibilityLabel={
-                          entry.when == null
-                            ? copy.lists.joinedAtUnknownAccessible(displayName)
-                            : copy.lists.joinedAtAccessible(
-                                displayName,
-                                entry.when,
-                              )
-                        }
-                        accessibilityRole="text"
-                        entering={rowEnter(index)}
-                        key={entry.member.personId}
-                        $last={index === history.entries.length - 1}
-                      >
-                        <MemberChip
-                          initials={
-                            isMe ? copy.lists.memberYouInitials : undefined
-                          }
-                          name={displayName}
-                          personId={entry.member.personId}
-                          photoURL={entry.member.photoURL ?? null}
-                        />
-                        <HistoryName numberOfLines={1} ellipsizeMode="tail">
+                        name={displayName}
+                        personId={member.personId}
+                        pending={!member.joined}
+                        photoURL={member.photoURL ?? null}
+                        size="large"
+                      />
+                      <MemberInfo>
+                        <MemberName numberOfLines={1} ellipsizeMode="tail">
                           {displayName}
-                        </HistoryName>
-                        <HistoryWhen>
-                          {entry.when ?? copy.lists.joinedAtUnknown}
-                        </HistoryWhen>
-                      </HistoryRow>
-                    );
-                  })}
-                  {history.truncated ? (
-                    <Note>
-                      {copy.lists.joinHistoryTruncated(
-                        history.entries.length,
-                        history.total,
+                        </MemberName>
+                        {isMe && identity != null ? (
+                          <MemberSub numberOfLines={1} ellipsizeMode="tail">
+                            {handle == null
+                              ? identity.name
+                              : `${identity.name} · @${handle}`}
+                          </MemberSub>
+                        ) : handle == null ? null : (
+                          <MemberSub numberOfLines={1} ellipsizeMode="tail">
+                            {`@${handle}`}
+                          </MemberSub>
+                        )}
+                        {member.joined ? null : (
+                          <MemberSub>{copy.lists.pendingInvite}</MemberSub>
+                        )}
+                      </MemberInfo>
+                      {member.role === 'owner' ? (
+                        <RoleTag>{copy.lists.roleOwner}</RoleTag>
+                      ) : (
+                        <RoleTag>
+                          {member.role === 'editor'
+                            ? copy.lists.roleEditor
+                            : copy.lists.roleViewer}
+                        </RoleTag>
                       )}
-                    </Note>
-                  ) : null}
-                </>
-              )}
-            </>
-          )}
+                      {isOwner && !isMe ? (
+                        <RemoveButton
+                          accessibilityLabel={copy.lists.removeMember(
+                            displayName,
+                          )}
+                          hitSlop={14}
+                          onPress={() =>
+                            setConfirmingRemove({
+                              personId: member.personId,
+                              name: displayName,
+                            })
+                          }
+                        >
+                          <RemoveText>
+                            {copy.lists.removeMemberLabel}
+                          </RemoveText>
+                        </RemoveButton>
+                      ) : null}
+                    </MemberRow>
+                  );
+                })}
+
+                {history.entries.length === 0 || justCreated ? null : (
+                  <>
+                    <SectionHeader testID="share-join-history">
+                      <SectionLabel>{`${copy.lists.joinHistoryHeader.toUpperCase()} · ${
+                        history.total
+                      }`}</SectionLabel>
+                      <SectionRule />
+                    </SectionHeader>
+                    {history.entries.map((entry, index) => {
+                      const isMe =
+                        entry.member.personId === personId ||
+                        entry.member.personId === identity?.personId;
+                      const displayName = isMe
+                        ? copy.lists.memberYou
+                        : memberDisplayName(
+                            entry.member,
+                            copy.lists.memberSomeone,
+                          );
+
+                      return (
+                        <HistoryRow
+                          // Grouped into one node on purpose: read apart, the
+                          // row would end on a bare dash instead of saying
+                          // there is no date for this person.
+                          accessible
+                          accessibilityLabel={
+                            entry.when == null
+                              ? copy.lists.joinedAtUnknownAccessible(
+                                  displayName,
+                                )
+                              : copy.lists.joinedAtAccessible(
+                                  displayName,
+                                  entry.when,
+                                )
+                          }
+                          accessibilityRole="text"
+                          entering={rowEnter(index)}
+                          key={entry.member.personId}
+                          $last={index === history.entries.length - 1}
+                        >
+                          <MemberChip
+                            initials={
+                              isMe ? copy.lists.memberYouInitials : undefined
+                            }
+                            name={displayName}
+                            personId={entry.member.personId}
+                            photoURL={entry.member.photoURL ?? null}
+                          />
+                          <HistoryName numberOfLines={1} ellipsizeMode="tail">
+                            {displayName}
+                          </HistoryName>
+                          <HistoryWhen>
+                            {entry.when ?? copy.lists.joinedAtUnknown}
+                          </HistoryWhen>
+                        </HistoryRow>
+                      );
+                    })}
+                    {history.truncated ? (
+                      <Note>
+                        {copy.lists.joinHistoryTruncated(
+                          history.entries.length,
+                          history.total,
+                        )}
+                      </Note>
+                    ) : null}
+                  </>
+                )}
+              </>
+            )}
+          </Body>
 
           {errorMessage == null ? null : (
             <ErrorBanner>
@@ -628,15 +661,18 @@ const ScrimTouch = styled.Pressable`
 `;
 
 /* The same white sheet the space is named on: this is its last step, not
-   another object. */
+   another object. The floor is set inline, from the safe area. */
 const Sheet = styled(Animated.View)`
+  ${sheetAnchor}
   background-color: ${({ theme }) => theme.colors.card};
   border-top-left-radius: ${({ theme }) => theme.radii.extraLarge}px;
   border-top-right-radius: ${({ theme }) => theme.radii.extraLarge}px;
-  margin-bottom: -80px;
   max-height: 91%;
-  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px
-    ${({ theme }) => theme.spacing.large + 88}px;
+  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px 0px;
+`;
+
+const Body = styled(ScrollView)`
+  flex-grow: 0;
 `;
 
 const Grabber = styled.View`

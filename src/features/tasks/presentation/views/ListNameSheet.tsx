@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import {
   BackHandler,
   Dimensions,
@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
 
 import {
@@ -25,9 +26,11 @@ import {
   TOGGLE,
   scrimEnter,
   scrimExit,
-  sheetEnter,
-  sheetExit,
 } from '../../../../app/animation/motion';
+import {
+  sheetAnchor,
+  useSheetRise,
+} from '../../../../app/animation/useSheetRise';
 import { useSheetOpenTrace } from '../../../../app/perf/sheetPerf';
 import type { TaskCopy } from '../localization/taskCopy';
 import { projectTint, projectTone } from '../models/projectAppearance';
@@ -222,12 +225,23 @@ export function ProjectEditorSheet({
   // the worklet runs on.
   const windowHeight = Dimensions.get('window').height;
   const ceiling = useAnimatedStyle(() => ({
-    maxHeight: windowHeight * 0.91 - keyboardHeight.value + 80,
+    maxHeight: windowHeight * 0.91 - keyboardHeight.value,
+  }));
+  // The floor comes from the safe area, not from a guessed overhang: the
+  // sheet ends under the gesture bar on both platforms, and standing on the
+  // keys it needs only the plain margin.
+  const insets = useContext(SafeAreaInsetsContext);
+  const restingFloor = theme.spacing.large + (insets?.bottom ?? 0);
+  const keysFloor = theme.spacing.large;
+  const rise = useSheetRise();
+  const floor = useAnimatedStyle(() => ({
+    paddingBottom: keyboardHeight.value > 0 ? keysFloor : restingFloor,
   }));
 
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={onCancel}
       statusBarTranslucent
       transparent
@@ -243,10 +257,8 @@ export function ProjectEditorSheet({
         </Scrim>
         <Lift style={lift}>
           <Sheet
-            entering={sheetEnter()}
-            exiting={sheetExit()}
             onLayout={traceOpen}
-            style={ceiling}
+            style={[ceiling, floor, rise]}
             testID="project-editor-sheet"
           >
             <Grabber />
@@ -605,13 +617,12 @@ const Body = styled(ScrollView)`
 `;
 
 const Sheet = styled(Animated.View)`
+  ${sheetAnchor}
   background-color: ${({ theme }) => theme.colors.card};
   border-top-left-radius: ${({ theme }) => theme.radii.extraLarge}px;
   border-top-right-radius: ${({ theme }) => theme.radii.extraLarge}px;
-  margin-bottom: -80px;
   max-height: 91%;
-  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px
-    ${({ theme }) => theme.spacing.large + 88}px;
+  padding: 12px ${({ theme }) => theme.spacing.medium + 4}px 0px;
 `;
 
 const Grabber = styled.View`

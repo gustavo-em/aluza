@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { BackHandler, Keyboard, Modal } from 'react-native';
 import Animated, {
-  useAnimatedKeyboard,
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import styled, { useTheme } from 'styled-components/native';
 
 import {
+  TOGGLE,
   scrimEnter,
   scrimExit,
-  sheetEnter,
-  sheetExit,
 } from '../../../../app/animation/motion';
+import {
+  sheetAnchor,
+  useSheetRiseValue,
+} from '../../../../app/animation/useSheetRise';
 import { useSheetOpenTrace } from '../../../../app/perf/sheetPerf';
 import type { ShareErrorKind } from '../../domain/ShareError';
 import type { TaskCopy } from '../localization/taskCopy';
@@ -50,18 +55,41 @@ export function JoinInviteSheet({
 
   // The sheet stands on the keys when they are up. Without this it stayed
   // where it was and the keyboard covered the field, the error and both
-  // buttons — everything the sheet exists to show. At rest the deeper floor
-  // comes back, and the negative margin with it, so the sheet still runs off
-  // the bottom of the screen instead of ending in a seam above the gesture
-  // bar.
-  const keyboard = useAnimatedKeyboard();
+  // buttons — everything the sheet exists to show. At rest the floor is the
+  // safe area's: the sheet runs under the gesture bar without a seam, on
+  // both platforms, and never past it.
+  //
+  // The height comes from the plain keyboard events, the same way the space
+  // editor reads it: Reanimated's keyboard hook watches the app window, and
+  // this sheet lives in a modal window of its own — inside it the hook never
+  // moved, and once the modal stopped resizing for the keys (it runs edge to
+  // edge now) the whole sheet sat behind them.
+  const insets = useContext(SafeAreaInsetsContext);
+  const restingFloor = theme.spacing.large + (insets?.bottom ?? 0);
+  const keysFloor = theme.spacing.large;
+  const keyboardHeight = useSharedValue(0);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', event => {
+      keyboardHeight.value = withTiming(event.endCoordinates.height, TOGGLE);
+    });
+    const hidden = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardHeight.value = withTiming(0, TOGGLE);
+    });
+
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [keyboardHeight]);
+
+  const rise = useSheetRiseValue();
+  // One transform for both movements: the sheet rising on open and the
+  // keyboard pushing it up. Two styles each writing `transform` would leave
+  // only the last one standing.
   const lift = useAnimatedStyle(() => ({
-    transform: [{ translateY: -keyboard.height.value }],
-    paddingBottom:
-      keyboard.height.value > 0
-        ? theme.spacing.large
-        : theme.spacing.large + 88,
-    marginBottom: keyboard.height.value > 0 ? 0 : -80,
+    transform: [{ translateY: rise.value - keyboardHeight.value }],
+    paddingBottom: keyboardHeight.value > 0 ? keysFloor : restingFloor,
   }));
 
   useEffect(() => {
@@ -99,6 +127,7 @@ export function JoinInviteSheet({
   return (
     <Modal
       animationType="none"
+      navigationBarTranslucent
       onRequestClose={onCancel}
       statusBarTranslucent
       transparent
@@ -112,12 +141,7 @@ export function JoinInviteSheet({
             onPress={onCancel}
           />
         </Scrim>
-        <Sheet
-          entering={sheetEnter()}
-          exiting={sheetExit()}
-          onLayout={traceOpen}
-          style={lift}
-        >
+        <Sheet onLayout={traceOpen} style={lift}>
           <Grabber />
           <Title accessibilityRole="header">{copy.lists.joinInviteTitle}</Title>
           <Hint>{copy.lists.joinInviteHint}</Hint>
@@ -199,6 +223,7 @@ const ScrimTouch = styled.Pressable`
 `;
 
 const Sheet = styled(Animated.View)`
+  ${sheetAnchor}
   background-color: ${({ theme }) => theme.colors.background};
   border-top-left-radius: ${({ theme }) => theme.radii.extraLarge}px;
   border-top-right-radius: ${({ theme }) => theme.radii.extraLarge}px;
