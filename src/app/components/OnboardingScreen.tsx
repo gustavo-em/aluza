@@ -33,7 +33,7 @@ import { brandGround, type BrandGround } from '../theme/brandGround';
 
 /** What the walk-through was answered with: the invite is the only answer that
  * asks the app to do something after it closes. */
-export type OnboardingOutcome = 'invite' | 'later' | 'join';
+export type OnboardingOutcome = 'invite' | 'later' | 'join' | 'hasInvite';
 
 interface OnboardingScreenProps {
   copy: TaskCopy;
@@ -220,6 +220,7 @@ export function OnboardingScreen({
   // a step to get through.
   const skip = useCallback(() => goTo(total - 1), [goTo, total]);
   const later = useCallback(() => onFinish('later'), [onFinish]);
+  const hasInvite = useCallback(() => onFinish('hasInvite'), [onFinish]);
   const invite = useCallback(() => onFinish('invite'), [onFinish]);
   const join = useCallback(() => onFinish('join'), [onFinish]);
 
@@ -333,17 +334,41 @@ export function OnboardingScreen({
                         </InviteText>
                       </Invite>
 
-                      {/* No second answer for somebody who already has one:
-                          "start alone" would be them refusing the invite they
-                          came in with. */}
+                      {/* No other answer for somebody the app already holds an
+                          invite for: "start alone" would be them refusing the
+                          invite they came in with, and the link is already
+                          here. */}
                       {invited ? null : (
-                        <Later
-                          accessibilityLabel={copy.onboarding.invite.later}
-                          onPress={later}
-                          testID={id('onboarding-invite-later')}
-                        >
-                          <LaterText>{copy.onboarding.invite.later}</LaterText>
-                        </Later>
+                        <>
+                          {/* The third door, and the one the other two used to
+                              hide: somebody can be holding a link the app knows
+                              nothing about — every iPhone that installed from
+                              the store rather than from the link itself. They
+                              were left choosing between making a second space
+                              and starting alone, neither of which is what they
+                              came for. */}
+                          <Second
+                            accessibilityLabel={
+                              copy.onboarding.invite.hasInvite
+                            }
+                            onPress={hasInvite}
+                            testID={id('onboarding-has-invite')}
+                          >
+                            <SecondText>
+                              {copy.onboarding.invite.hasInvite}
+                            </SecondText>
+                          </Second>
+
+                          <Later
+                            accessibilityLabel={copy.onboarding.invite.later}
+                            onPress={later}
+                            testID={id('onboarding-invite-later')}
+                          >
+                            <LaterText>
+                              {copy.onboarding.invite.later}
+                            </LaterText>
+                          </Later>
+                        </>
                       )}
 
                       <DotsCentred>
@@ -588,6 +613,23 @@ const InviteText = styled.Text<{ $color: string }>`
 
 /** Outlined, not filled: leaving without inviting is a real answer, but it is
  * not the one the step is asking for. */
+/** The middle answer: a real button, but quieter than the one that makes a
+ * space — most people arriving here are not holding a link. */
+const Second = styled(PressableScale)`
+  min-height: 48px;
+  border-radius: 15px;
+  align-items: center;
+  justify-content: center;
+  border-width: 1.5px;
+  border-color: ${brandGround.onSolLine};
+`;
+
+const SecondText = styled.Text`
+  font-size: 14px;
+  font-weight: 700;
+  color: ${brandGround.onSol};
+`;
+
 const Later = styled(PressableScale)`
   min-height: 48px;
   border-radius: 15px;

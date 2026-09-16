@@ -98,8 +98,10 @@ function AppContent({
   bus,
   incomingInviteToken,
   inviteIntent,
+  joinIntent,
   onIncomingInviteHandled,
   onInviteIntentDone,
+  onJoinIntentDone,
   onReady,
   onReplayOnboarding,
 }: {
@@ -114,6 +116,12 @@ function AppContent({
    * space and its invite are made here, without another question. */
   inviteIntent: boolean;
   onInviteIntentDone: () => void;
+  /** Somebody said on the walk-through that they are holding an invite the app
+   * never saw — the link was opened on a phone that had no app yet, and the
+   * store carried nothing across. The sheet that takes a link opens itself as
+   * soon as there is an account to join with. */
+  joinIntent: boolean;
+  onJoinIntentDone: () => void;
   onReady: () => void;
   /** Reopens the walk-through from settings. The shell owns it, because the
    * same screen also covers the signed-out side. */
@@ -278,6 +286,14 @@ function AppContent({
     selectTab('lists');
   }, [inviteIntent, selectTab, tasks.isRestored]);
 
+  // A link somebody says they have goes to the same tab: the sheet that takes
+  // one lives there too.
+  useEffect(() => {
+    if (!joinIntent || !tasks.isRestored) return;
+
+    selectTab('lists');
+  }, [joinIntent, selectTab, tasks.isRestored]);
+
   // A tapped invite link goes to the same place, for the same reason: the
   // sheet that opens on it lives on the spaces tab.
   useEffect(() => {
@@ -422,10 +438,12 @@ function AppContent({
           {app.activeTab === 'lists' ? (
             <ListsScreen
               autoInvite={inviteIntent}
+              autoJoin={joinIntent}
               copy={app.copy}
               incomingInviteToken={incomingInviteToken}
               language={app.language}
               onAutoInviteDone={onInviteIntentDone}
+              onAutoJoinDone={onJoinIntentDone}
               focusRunning={focusRow != null}
               onChooseFocusDuration={chooseFocusDurationFor}
               onIncomingInviteHandled={onIncomingInviteHandled}
@@ -600,6 +618,7 @@ function AppShell({
   // Held in memory only: an app that dies before the account is created opens
   // the normal way next time, with no half-finished invite waiting.
   const [inviteIntent, setInviteIntent] = useState(false);
+  const [joinIntent, setJoinIntent] = useState(false);
   const handleContentReady = useCallback(() => setIsContentReady(true), []);
   const replayOnboarding = useCallback(
     () => setIsReplayingOnboarding(true),
@@ -683,9 +702,13 @@ function AppShell({
     // token is already held, and the space it opens is somebody else's —
     // making one here would be the second space nobody asked for.
     if (outcome === 'invite') setInviteIntent(true);
+    // `hasInvite` leaves the opposite of `invite` to do: no space is made, and
+    // the sheet that takes a link opens once there is an account.
+    if (outcome === 'hasInvite') setJoinIntent(true);
   };
 
   const clearInviteIntent = useCallback(() => setInviteIntent(false), []);
+  const clearJoinIntent = useCallback(() => setJoinIntent(false), []);
 
   return (
     <Root>
@@ -715,11 +738,13 @@ function AppShell({
             bus={bus}
             incomingInviteToken={incomingInvite.token}
             inviteIntent={inviteIntent}
+            joinIntent={joinIntent}
             /* One account, one mount: remounting on the uid drops the previous
                session's tasks from memory, not only from storage. */
             key={personId ?? 'anon'}
             onIncomingInviteHandled={incomingInvite.clear}
             onInviteIntentDone={clearInviteIntent}
+            onJoinIntentDone={clearJoinIntent}
             onReady={handleContentReady}
             onReplayOnboarding={replayOnboarding}
           />

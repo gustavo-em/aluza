@@ -114,6 +114,11 @@ interface ListsScreenProps {
    * screen after the account is the invite itself. */
   autoInvite?: boolean;
   onAutoInviteDone?: () => void;
+  /** Somebody who said on the walk-through that they are holding a link. The
+   * sheet opens empty, for them to paste it: unlike the tapped-link case, the
+   * app never saw the token — the store install carried nothing across. */
+  autoJoin?: boolean;
+  onAutoJoinDone?: () => void;
   /** A token that arrived from a tapped invite link. The sheet opens on it
    * with the field already filled, so the link is confirmed rather than
    * retyped — and rather than acted on without anybody seeing what it was. */
@@ -207,9 +212,11 @@ function streakDaysOf(
 /** Lists hold the next steps of something bigger, opening in place for comparison. */
 export function ListsScreen({
   autoInvite = false,
+  autoJoin = false,
   incomingInviteToken = null,
   onIncomingInviteHandled,
   onAutoInviteDone,
+  onAutoJoinDone,
   copy,
   language,
   notificationPrompt,
@@ -327,6 +334,7 @@ export function ListsScreen({
 
   const personId = viewModel.identity?.personId ?? null;
   const autoInviteRan = useRef(false);
+  const autoJoinRan = useRef(false);
 
   // A link tapped outside the app lands here. It waits for the account: on a
   // clean phone the link is what started the install, and there is a sign-in
@@ -461,6 +469,23 @@ export function ListsScreen({
   // its link. The suggested name may already be taken — the space gets a
   // numbered one instead of sending anybody back to pick a template, and the
   // name is theirs to change from the card afterwards.
+  // Somebody holding a link the app never saw: the sheet opens empty and they
+  // paste it. No space is made on the way — the one they were called to
+  // already exists, and making another is what the two old answers did.
+  useEffect(() => {
+    if (!autoJoin) {
+      autoJoinRan.current = false;
+      return;
+    }
+
+    if (autoJoinRan.current) return;
+    if (!viewModel.isRestored || personId == null) return;
+
+    autoJoinRan.current = true;
+    setJoiningInvite(true);
+    onAutoJoinDone?.();
+  }, [autoJoin, onAutoJoinDone, personId, viewModel.isRestored]);
+
   useEffect(() => {
     // The guard is only about the run in progress: the screen stays mounted for
     // the whole session, so asking again from the replayed walk-through has to

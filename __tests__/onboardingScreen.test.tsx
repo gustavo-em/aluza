@@ -77,6 +77,45 @@ describe('first-run walk-through', () => {
     expect(onFinish).toHaveBeenCalledWith('join');
   });
 
+  it('offers a third door to somebody holding a link the app never saw', () => {
+    // Installing from the store carries nothing across on iPhone, so the app
+    // can hold an invite and know nothing about it. Without this answer the
+    // other two are both wrong: one makes a second space, the other puts them
+    // alone in it.
+    const onFinish = jest.fn();
+    const tree = renderOnboarding(onFinish);
+
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+
+    const texts = tree.root
+      .findAll(node => (node.type as unknown) === 'Text')
+      .flatMap(node =>
+        node.children.filter(
+          (child): child is string => typeof child === 'string',
+        ),
+      );
+
+    expect(texts).toContain(getTaskCopy('pt-BR').onboarding.invite.hasInvite);
+
+    press(tree.root.findByProps({ testID: 'onboarding-has-invite' }));
+    expect(onFinish).toHaveBeenLastCalledWith('hasInvite');
+  });
+
+  it('keeps the third door shut for somebody the app already holds an invite for', () => {
+    const onFinish = jest.fn();
+    const tree = renderOnboarding(onFinish, true);
+
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+    press(tree.root.findByProps({ testID: 'onboarding-next' }));
+
+    // Their link is already here; asking them to paste one would be asking
+    // for what the app is holding.
+    expect(
+      tree.root.findAllByProps({ testID: 'onboarding-has-invite' }),
+    ).toHaveLength(0);
+  });
+
   it('shows three cut-outs of the product and ends on the invite step', () => {
     const onFinish = jest.fn();
     const tree = renderOnboarding(onFinish);

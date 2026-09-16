@@ -108,6 +108,8 @@ function render(
   screenProps: {
     autoInvite?: boolean;
     onAutoInviteDone?: () => void;
+    autoJoin?: boolean;
+    onAutoJoinDone?: () => void;
     incomingInviteToken?: string | null;
     onIncomingInviteHandled?: () => void;
   } = {},
@@ -355,6 +357,20 @@ describe('creating a project that is already a group', () => {
 
     expect(calls).toEqual([]);
     expect(has(root, 'mock-share-sheet')).toBe(false);
+  });
+
+  it('opens the sheet for whoever said on the walk-through that they hold a link', () => {
+    // Nothing is made for them: the space they were called to exists, and the
+    // two old answers would each have produced the wrong thing.
+    const done = jest.fn();
+    const root = render(
+      { isRestored: true },
+      { autoJoin: true, onAutoJoinDone: done },
+    );
+
+    expect(has(root, 'mock-join-sheet')).toBe(true);
+    expect(has(root, 'mock-share-sheet')).toBe(false);
+    expect(done).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the way in for whoever arrives with a link', () => {

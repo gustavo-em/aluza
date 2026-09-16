@@ -655,6 +655,11 @@ export interface TaskCopy {
       /** Somebody who arrived holding an invite. Neither of the two answers
        * above is theirs: one would make a second space, the other would put
        * them alone in it, and the space they were called to is elsewhere. */
+      /** Somebody holding a link the app knows nothing about — which is most
+       * of them on iPhone, where installing from the store carries nothing
+       * across. Without this door the two answers above are both wrong for
+       * them: one makes a second space, the other puts them alone in it. */
+      hasInvite: string;
       invitedNote: string;
       invitedAction: string;
     };
@@ -1331,6 +1336,7 @@ const ptBR: TaskCopy = {
         'para você. Chame quem divide ele com você — um link, sem cadastro antes.',
       action: 'Convidar quem divide o espaço',
       later: 'Começar sozinho por enquanto',
+      hasInvite: 'Tenho um link de convite',
       invitedNote:
         'Você já tem um convite. Entre e o espaço aparece aqui, com o que já estiver nele.',
       invitedAction: 'Entrar no espaço',
@@ -1998,6 +2004,7 @@ const enUS: TaskCopy = {
         'space for you. Invite whoever shares it with you — a link, no sign-up first.',
       action: 'Invite whoever shares the space',
       later: 'Start on my own for now',
+      hasInvite: 'I have an invite link',
       invitedNote:
         'You already have an invite. Come in and the space shows up here, with whatever is already in it.',
       invitedAction: 'Join the space',
