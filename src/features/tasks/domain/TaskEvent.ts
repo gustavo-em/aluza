@@ -22,7 +22,9 @@ import type { Workspace } from './Workspace';
  * whether the spaces screen is a place they work in or only a place they look
  * at.
  */
-export type CaptureOrigin = 'today' | 'list' | 'group';
+/** `batch` is the sheet that reads a whole note into several tasks: the one
+ * door where a task is not typed on its own. */
+export type CaptureOrigin = 'today' | 'list' | 'group' | 'batch' | 'voice';
 
 export type TaskEvent =
   | {

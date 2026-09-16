@@ -230,3 +230,77 @@ describe('capture a task with its steps', () => {
     expect(result.workspace.tasks[0].subtasks).toHaveLength(MAX_SUBTASKS);
   });
 });
+
+describe('who takes a task written inside a shared space', () => {
+  const shared = {
+    ...EMPTY_WORKSPACE,
+    lists: [
+      ...EMPTY_WORKSPACE.lists,
+      {
+        id: 'casa',
+        name: 'Casa',
+        color: 'coral' as const,
+        icon: 'home' as const,
+        share: {
+          token: 'tok-1',
+          invitedAs: 'editor' as const,
+          members: [
+            {
+              personId: 'p-1',
+              name: 'Joana',
+              handle: null,
+              role: 'owner' as const,
+              joined: true,
+            },
+            {
+              personId: 'p-2',
+              name: 'Rafa',
+              handle: null,
+              role: 'editor' as const,
+              joined: true,
+            },
+          ],
+        },
+      },
+    ],
+  };
+
+  it('keeps the people chosen in the sheet, and only members of the space', () => {
+    const result = captureTask(
+      shared,
+      'lavar a louça',
+      { nowMs: now, createId },
+      { listId: 'casa', assignedIds: ['p-1', 'p-2', 'p-9'] },
+    );
+
+    expect(result.workspace.tasks[0].assignedIds).toEqual(['p-1', 'p-2']);
+  });
+
+  it('gives a task of your own to nobody: there is no project to hold it', () => {
+    const result = captureTask(
+      shared,
+      'lavar a louça',
+      { nowMs: now, createId },
+      { listId: null, assignedIds: ['p-1'] },
+    );
+
+    expect(result.workspace.tasks[0].assignedIds).toBeUndefined();
+  });
+
+  it('never puts somebody on a reminder', () => {
+    const result = captureTask(
+      shared,
+      'aniversário da vó',
+      { nowMs: now, createId },
+      {
+        listId: 'casa',
+        kind: 'reminder',
+        dueAtMs: now + 86400000,
+        assignedIds: ['p-1'],
+      },
+    );
+
+    expect(result.workspace.tasks[0].kind).toBe('reminder');
+    expect(result.workspace.tasks[0].assignedIds).toBeUndefined();
+  });
+});

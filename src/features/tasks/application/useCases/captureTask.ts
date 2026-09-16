@@ -60,6 +60,11 @@ export interface CaptureOverrides {
   kind?: TaskKind;
   /** How often a reminder comes back. Ignored while capturing a task. */
   recurrence?: ReminderRecurrence;
+  /** Who takes the task, chosen while it is written inside a shared space.
+   * Kept only for a space that is actually shared, and only for people who
+   * are in it: assignment is content of a shared project, nothing else can
+   * hold it. */
+  assignedIds?: readonly string[];
 }
 
 /**
@@ -109,13 +114,26 @@ export function captureTask(
   // remind about: the item is kept as the task it looks like rather than saved
   // as something that can never speak.
   const isReminderItem = overrides.kind === 'reminder' && dueAtMs != null;
+  const listId =
+    chosenListId === undefined
+      ? explicitList?.id ?? newList?.id ?? existingList?.id ?? INBOX_LIST_ID
+      : chosenListId ?? INBOX_LIST_ID;
+  // Who takes it, kept only where that means something: a shared space, and
+  // only people who are in it. A task of your own has nobody to be given to,
+  // and memory has nothing to take. The rule on the server refuses anybody
+  // else anyway; this is what keeps the phone from drawing a ficha the
+  // server is about to take back.
+  const share = lists.find(list => list.id === listId)?.share ?? null;
+  const assignedIds =
+    isReminderItem || share == null
+      ? []
+      : (overrides.assignedIds ?? []).filter(personId =>
+          share.members.some(member => member.personId === personId),
+        );
   const task: Task = {
     id: createId(nowMs),
     title: draft.title,
-    listId:
-      chosenListId === undefined
-        ? explicitList?.id ?? newList?.id ?? existingList?.id ?? INBOX_LIST_ID
-        : chosenListId ?? INBOX_LIST_ID,
+    listId,
     priority: isReminderItem ? 'medium' : overrides.priority ?? draft.priority,
     dueAtMs,
     // Asked for in the sheet, and only kept when the date it counts back from
@@ -132,6 +150,7 @@ export function captureTask(
     // Written with the task or added later, from the task itself. Either way
     // the task lands complete: one capture, one event.
     subtasks: isReminderItem ? [] : subtasks,
+    ...(assignedIds.length === 0 ? {} : { assignedIds }),
     kind: isReminderItem ? 'reminder' : 'task',
     ...(isReminderItem ? { recurrence: overrides.recurrence ?? 'once' } : {}),
   };
@@ -152,4 +171,56 @@ export function captureTask(
   events.push({ type: 'workspace.committed', at: nowMs, workspace: next });
 
   return { workspace: next, events };
+}
+
+/**
+ * Several lines captured in one breath, from the batch sheet.
+ *
+ * Each line goes through `captureTask` on its own, so a task written in a
+ * batch is read exactly like one written alone; the workspace is committed
+ * once at the end, which is the one thing persistence and the push listen
+ * for. A line that says nothing is skipped, never an error.
+ */
+/**
+ * One line of a batch. A plain string is read entirely by `parseCapture`, the
+ * way a typed line is; the object form carries facts the sheet already knows
+ * — the date and the priority a spoken note was read with, and which the
+ * person may have corrected on the card before confirming.
+ */
+export type CaptureLine =
+  | string
+  | { text: string; overrides?: CaptureOverrides };
+
+export function captureTasks(
+  workspace: Workspace,
+  lines: readonly CaptureLine[],
+  dependencies: CaptureDependencies,
+  overrides: CaptureOverrides = {},
+): UseCaseResult {
+  let current = workspace;
+  const events: TaskEvent[] = [];
+
+  for (const entry of lines) {
+    const line = typeof entry === 'string' ? entry : entry.text;
+    const result = captureTask(current, line, dependencies, {
+      ...overrides,
+      ...(typeof entry === 'string' ? {} : entry.overrides),
+    });
+    if (result.events.length === 0) continue;
+
+    current = result.workspace;
+    events.push(
+      ...result.events.filter(event => event.type !== 'workspace.committed'),
+    );
+  }
+
+  if (events.length === 0) return { workspace, events: [] };
+
+  events.push({
+    type: 'workspace.committed',
+    at: dependencies.nowMs,
+    workspace: current,
+  });
+
+  return { workspace: current, events };
 }
