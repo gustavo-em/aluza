@@ -119,6 +119,21 @@
         "source": "/privacy",
         "destination": "/privacidade#en",
         "type": 301
+      },
+      {
+        "source": "/roomspire/privacy",
+        "destination": "/roomspire/privacidade#en",
+        "type": 301
+      },
+      {
+        "source": "/roomspire/privacy-policy",
+        "destination": "/roomspire/privacidade#en",
+        "type": 301
+      },
+      {
+        "source": "/roomspire/support",
+        "destination": "/roomspire/suporte#en",
+        "type": 301
       }
     ]
   }
